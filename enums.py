@@ -13,6 +13,10 @@ class CMSFolders(Enum):
     POST_LICENCE = "i) Post Licence"
     ORIGINAL_SUBMISSION = "j) Original Submission"
 
+    @classmethod
+    def get_values(cls):
+        return [member.value for member in cls]
+
 
 class CMSPathTypes(Enum):
     PRODUCT = "Product"
@@ -23,3 +27,27 @@ class CMSPathTypes(Enum):
     CLINICAL_TRIAL = "Clinical Trial"
     COMPANY = "Company"
     MASTER_FILE = "Master File"
+
+    @classmethod
+    def get_values(cls):
+        return [member.value for member in cls]
+
+
+class CMSSubmissionsFileExcelColumns(Enum):
+    SUBMISSION = "Submission"
+    SOURCE = "Source"
+    DESTINATION = "Destination"
+
+    @classmethod
+    def get_values(cls):
+        return [member.value for member in cls]
+
+
+class CMSTools(Enum):
+    PATH_BUILDER = "Path Builder"
+    BULK_UPLOADER = "Bulk Uploader"
+
+    @classmethod
+    def get_values(cls):
+        return [member.value for member in cls]
+
