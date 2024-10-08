@@ -1,7 +1,5 @@
 import os
 import logging
-import time
-from datetime import datetime
 import re
 import openpyxl
 from enums import CMSPathTypes, CMSSubmissionsFileExcelColumns, CMSTools
@@ -61,8 +59,13 @@ def handle_cms_path_builder(submissions_file_path: str, path_type: str) -> str:
     submissions_col = ws.cell(row=1, column=1).value
     source_col = ws.cell(row=1, column=2).value
 
+    if submissions_col is None or source_col is None:
+        return "error - excel file columns"
+
     if submissions_col.lower() != CMSSubmissionsFileExcelColumns.SUBMISSION.value.lower() or source_col.lower() != CMSSubmissionsFileExcelColumns.SOURCE.value.lower():
         return "error - excel file columns"
+
+    ws.cell(row=1, column=3).value = CMSSubmissionsFileExcelColumns.DESTINATION.value
 
     row_count = 2
     for row in ws.iter_rows(min_row=2, max_col=2, values_only=True):
@@ -113,6 +116,8 @@ def handle_cms_path_builder(submissions_file_path: str, path_type: str) -> str:
             return "error"
 
         row_count += 1
+
+    wb.save(submissions_file_path)
     return "success"
 
 
@@ -151,6 +156,9 @@ def handle_bulk_uploader(file_path: str, generate_log_file: bool, create_missing
     source_col = ws.cell(row=1, column=2).value
     dest_col = ws.cell(row=1, column=3).value
 
+    if submissions_col is None or source_col is None or dest_col is None:
+        return "error - excel file columns"
+
     if (submissions_col.lower() != CMSSubmissionsFileExcelColumns.SUBMISSION.value.lower() or
             source_col.lower() != CMSSubmissionsFileExcelColumns.SOURCE.value.lower() or
             dest_col.lower() != CMSSubmissionsFileExcelColumns.DESTINATION.value.lower()):
@@ -162,7 +170,6 @@ def handle_bulk_uploader(file_path: str, generate_log_file: bool, create_missing
                             format="%(asctime)s - %(levelname)s - %(message)s")
         logging.info("File upload started...")
 
-    row_count = 2
     for row in ws.iter_rows(min_row=2, max_col=3, values_only=True):
         try:
             print(f"{str(row[0])}")
@@ -217,20 +224,34 @@ def handle_bulk_uploader(file_path: str, generate_log_file: bool, create_missing
             if generate_log_file:
                 logging.error(str(e))
 
-        row_count += 1
-
     return "success"
 
 
 def run_app():
     console = Console()
     console.print("CMS Automation Tool", style="bold green")
-    user_input = Prompt.ask(prompt="[bold green]Which tool would you like to use?[/bold green]", choices=["Path Builder", "Bulk Uploader"], show_choices=True, case_sensitive=False, console=console)
+    console.print(f"{'-'*50}", style="bold blue")
 
-    if user_input.lower() == CMSTools.PATH_BUILDER.value.lower():
-        print("path builder")
-    elif user_input.lower() == CMSTools.BULK_UPLOADER.value.lower():
-        print("bulk uploader")
-    time.sleep(10)
-    console.print("Done!", style="bold green")
+    while True:
+
+        tool_selection_input = Prompt.ask(prompt="[bold green]Which tool would you like to use?[/bold green]", choices=["Path Builder", "Bulk Uploader"], show_choices=True, case_sensitive=False, console=console)
+
+        results = ""
+
+        if tool_selection_input.lower() == CMSTools.PATH_BUILDER.value.lower():
+            file_path_input = Prompt.ask("[bold green]Enter path to the file containing submissions[/bold green]", console=console)
+            type_choices = CMSPathTypes.get_values()
+            path_type_input = Prompt.ask(prompt="[bold green]Enter the type of path to build", choices=type_choices, show_choices=True, case_sensitive=False, console=console)
+            results = handle_cms_path_builder(file_path_input, path_type_input)
+
+        elif tool_selection_input.lower() == CMSTools.BULK_UPLOADER.value.lower():
+            file_path_input = Prompt.ask("[bold green]Enter path to the file containing submissions, along with their source and destination information[/bold green]", console=console)
+            results = handle_bulk_uploader(file_path_input, True, True)
+
+        console.print(f"{results}", style="bold green")
+        run_another_input = Prompt.ask(prompt="[bold blue]Would you like to run another tool?[/bold blue]", choices=["Yes", "No"], show_choices=True, case_sensitive=False, console=console)
+
+        if run_another_input.lower() == "no":
+            console.print(f"Exiting...", style="bold red")
+            break
 
