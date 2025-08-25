@@ -9,6 +9,8 @@ import shutil
 from constants import DRIVE_LETTER, CMS_FOLDER
 from rich.console import Console
 from rich.prompt import Prompt
+import tkinter as tk
+from tkinter import filedialog
 
 
 def handle_cms_path_builder(submissions_file_path: str, path_type: str) -> str:
@@ -118,6 +120,84 @@ def handle_cms_path_builder(submissions_file_path: str, path_type: str) -> str:
         row_count += 1
 
     wb.save(submissions_file_path)
+    return "success"
+
+def handle_interactive_cms_path_builder(path_type: str, is_submissions_file_path: str, console: Console) -> str:
+   
+    if is_submissions_file_path.lower() == "yes":
+        submissions_file_path = Prompt.ask("[bold green]Enter path to the file containing submissions[/bold green]", console=console)
+
+        if not os.path.isfile(submissions_file_path):
+            return "error - file path"
+
+        if not submissions_file_path.endswith(".xlsx"):
+            return "error - file path"
+
+        wb = openpyxl.load_workbook(submissions_file_path)
+        ws = wb.active
+
+        path_builder = MapPathBuilder()
+        path_finder = PathFinder()
+
+        submissions_col = ws.cell(row=1, column=1).value
+        ws.cell(row=1, column=2).value = CMSSubmissionsFileExcelColumns.SOURCE.value
+        ws.cell(row=1, column=3).value = CMSSubmissionsFileExcelColumns.DESTINATION.value
+
+        if submissions_col is None:
+            return "error - excel file columns"
+
+        if submissions_col.lower() != CMSSubmissionsFileExcelColumns.SUBMISSION.value.lower():
+            return "error - excel file columns"
+
+        root = tk.Tk()
+        root.withdraw()
+
+        submissions = [cell.value for cell in ws["A"][1:] if cell.value is not None]
+
+        submission_cms_path_dict = {}
+
+        is_same_files_each_sub = Prompt.ask("[bold green]Would you like to upload the same files to every submission?[/bold green]", choices=["Yes", "No"], show_choices=True, case_sensitive=False, console=console)
+
+        if is_same_files_each_sub.lower() == "yes":
+            root.attributes('-topmost', True)
+            source_files = filedialog.askopenfilenames(title=f"Select Files for All Submissions")
+
+            row = 2
+
+            for sub in submissions:
+
+                matches = re.findall(r"\b\d{6}", str(sub).lower())
+                try:
+                    # Look for post licence folder
+                    path = path_finder.find_product_post_licence_folder(
+                        path_builder.build_product_path(str(matches[0])),
+                        str(matches[0]))
+
+                    submission_cms_path_dict[sub] = path if path is not None else ""
+
+                except FileNotFoundError:
+                    submission_cms_path_dict[sub] = ""
+                
+                for file_path in source_files:
+                    ws.cell(row=row, column=1).value = sub
+                    ws.cell(row=row, column=2).value = file_path
+                    ws.cell(row=row, column=3).value = submission_cms_path_dict[sub]
+                    row += 1
+            
+            wb.save(submissions_file_path)
+            return "success"
+
+        # else:
+        # Build the source paths for each submission
+
+        # If they dont iterate each submission and open the file dialog for each one
+        # Build the source paths for each submission
+
+
+
+    else:
+        print("enter submission...")
+
     return "success"
 
 
@@ -234,7 +314,7 @@ def run_app():
 
     while True:
 
-        tool_selection_input = Prompt.ask(prompt="[bold green]Which tool would you like to use?[/bold green]", choices=["Path Builder", "Bulk Uploader"], show_choices=True, case_sensitive=False, console=console)
+        tool_selection_input = Prompt.ask(prompt="[bold green]Which tool would you like to use?[/bold green]", choices=CMSTools.get_values(), show_choices=True, case_sensitive=False, console=console)
 
         results = ""
 
@@ -243,6 +323,11 @@ def run_app():
             type_choices = CMSPathTypes.get_values()
             path_type_input = Prompt.ask(prompt="[bold green]Enter the type of path to build", choices=type_choices, show_choices=True, case_sensitive=False, console=console)
             results = handle_cms_path_builder(file_path_input, path_type_input)
+
+        elif tool_selection_input.lower() == CMSTools.INTERACTIVE_PATH_BUILDER.value.lower():
+            path_type_input = Prompt.ask(prompt="[bold green]Enter the type of path to build", choices=CMSPathTypes.get_values(), show_choices=True, case_sensitive=False, console=console)
+            is_submissions_file_path = Prompt.ask(prompt="[bold green]Would you like to enter the path to the file containing submissions?[/bold green]", choices=["Yes", "No"], show_choices=True, case_sensitive=False, console=console)
+            result = handle_interactive_cms_path_builder(path_type_input, is_submissions_file_path, console)
 
         elif tool_selection_input.lower() == CMSTools.BULK_UPLOADER.value.lower():
             file_path_input = Prompt.ask("[bold green]Enter path to the file containing submissions, along with their source and destination information[/bold green]", console=console)

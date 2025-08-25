@@ -1,7 +1,14 @@
 from enum import Enum
 
+class BaseEnum(Enum):
+    
+    @classmethod
+    def get_values(cls):
+        """Returns a list of all the values in the enum."""
+        return [member.value for member in cls]
 
-class CMSFolders(Enum):
+
+class CMSFolders(BaseEnum):
     CORRESPONDENCE_GENERAL = "a) Correspondence General"
     CORRESPONDENCE_ASSESSMENT = "b) Correspondence Assessment"
     EPLA_LABEL = "c) ePLA & label"
@@ -13,12 +20,8 @@ class CMSFolders(Enum):
     POST_LICENCE = "i) Post Licence"
     ORIGINAL_SUBMISSION = "j) Original Submission"
 
-    @classmethod
-    def get_values(cls):
-        return [member.value for member in cls]
 
-
-class CMSPathTypes(Enum):
+class CMSPathTypes(BaseEnum):
     PRODUCT = "Product"
     PRODUCT_POST_LICENCE_FOLDER = "Product - Post Licence Folder"
     SITE = "Site"
@@ -28,26 +31,15 @@ class CMSPathTypes(Enum):
     COMPANY = "Company"
     MASTER_FILE = "Master File"
 
-    @classmethod
-    def get_values(cls):
-        return [member.value for member in cls]
 
-
-class CMSSubmissionsFileExcelColumns(Enum):
+class CMSSubmissionsFileExcelColumns(BaseEnum):
     SUBMISSION = "Submission"
     SOURCE = "Source"
     DESTINATION = "Destination"
 
-    @classmethod
-    def get_values(cls):
-        return [member.value for member in cls]
 
-
-class CMSTools(Enum):
+class CMSTools(BaseEnum):
     PATH_BUILDER = "Path Builder"
     BULK_UPLOADER = "Bulk Uploader"
-
-    @classmethod
-    def get_values(cls):
-        return [member.value for member in cls]
+    INTERACTIVE_PATH_BUILDER = "Interactive Path Builder"
 
