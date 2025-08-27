@@ -11,6 +11,7 @@ from rich.console import Console
 from rich.prompt import Prompt
 import tkinter as tk
 from tkinter import filedialog
+from utils import prompt_from_numbered_list
 
 
 def handle_cms_path_builder(submissions_file_path: str, path_type: str) -> str:
@@ -314,22 +315,27 @@ def run_app():
 
     while True:
 
-        tool_selection_input = Prompt.ask(prompt="[bold green]Which tool would you like to use?[/bold green]", choices=CMSTools.get_values(), show_choices=True, case_sensitive=False, console=console)
+        tool_selection = prompt_from_numbered_list(
+            console,
+            "Which tool would you like to use?",
+            CMSTools.get_values()
+        )
+
 
         results = ""
 
-        if tool_selection_input.lower() == CMSTools.PATH_BUILDER.value.lower():
+        if tool_selection == CMSTools.PATH_BUILDER.value:
             file_path_input = Prompt.ask("[bold green]Enter path to the file containing submissions[/bold green]", console=console)
             type_choices = CMSPathTypes.get_values()
             path_type_input = Prompt.ask(prompt="[bold green]Enter the type of path to build", choices=type_choices, show_choices=True, case_sensitive=False, console=console)
             results = handle_cms_path_builder(file_path_input, path_type_input)
 
-        elif tool_selection_input.lower() == CMSTools.INTERACTIVE_PATH_BUILDER.value.lower():
+        elif tool_selection == CMSTools.INTERACTIVE_PATH_BUILDER.value:
             path_type_input = Prompt.ask(prompt="[bold green]Enter the type of path to build", choices=CMSPathTypes.get_values(), show_choices=True, case_sensitive=False, console=console)
             is_submissions_file_path = Prompt.ask(prompt="[bold green]Would you like to enter the path to the file containing submissions?[/bold green]", choices=["Yes", "No"], show_choices=True, case_sensitive=False, console=console)
             result = handle_interactive_cms_path_builder(path_type_input, is_submissions_file_path, console)
 
-        elif tool_selection_input.lower() == CMSTools.BULK_UPLOADER.value.lower():
+        elif tool_selection == CMSTools.BULK_UPLOADER.value:
             file_path_input = Prompt.ask("[bold green]Enter path to the file containing submissions, along with their source and destination information[/bold green]", console=console)
             results = handle_bulk_uploader(file_path_input, True, True)
 
