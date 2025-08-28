@@ -321,19 +321,17 @@ def run_app():
             CMSTools.get_values()
         )
 
-
         results = ""
 
         if tool_selection == CMSTools.PATH_BUILDER.value:
             file_path_input = Prompt.ask("[bold green]Enter path to the file containing submissions[/bold green]", console=console)
-            type_choices = CMSPathTypes.get_values()
-            path_type_input = Prompt.ask(prompt="[bold green]Enter the type of path to build", choices=type_choices, show_choices=True, case_sensitive=False, console=console)
-            results = handle_cms_path_builder(file_path_input, path_type_input)
+            path_type_selection = prompt_from_numbered_list(console, "Which type of path would you like to build?", CMSPathTypes.get_values())
+            results = handle_cms_path_builder(file_path_input, path_type_selection)
 
         elif tool_selection == CMSTools.INTERACTIVE_PATH_BUILDER.value:
-            path_type_input = Prompt.ask(prompt="[bold green]Enter the type of path to build", choices=CMSPathTypes.get_values(), show_choices=True, case_sensitive=False, console=console)
+            path_type_selection = prompt_from_numbered_list(console, "Which type of path would you like to build?", CMSPathTypes.get_values())
             is_submissions_file_path = Prompt.ask(prompt="[bold green]Would you like to enter the path to the file containing submissions?[/bold green]", choices=["Yes", "No"], show_choices=True, case_sensitive=False, console=console)
-            result = handle_interactive_cms_path_builder(path_type_input, is_submissions_file_path, console)
+            result = handle_interactive_cms_path_builder(path_type_selection, is_submissions_file_path, console)
 
         elif tool_selection == CMSTools.BULK_UPLOADER.value:
             file_path_input = Prompt.ask("[bold green]Enter path to the file containing submissions, along with their source and destination information[/bold green]", console=console)
