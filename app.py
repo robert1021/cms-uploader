@@ -152,48 +152,59 @@ def handle_interactive_cms_path_builder(path_type: str, is_submissions_file_path
 
         root = tk.Tk()
         root.withdraw()
+        root.attributes('-topmost', True)
 
         submissions = [cell.value for cell in ws["A"][1:] if cell.value is not None]
 
         submission_cms_path_dict = {}
+        row = 2
+
+        # TODO: Only handles post licence path for now
+
+        # Find the paths in CMS
+        for sub in submissions:
+            matches = re.findall(r"\b\d{6}", str(sub).lower())
+            try:
+                # Look for post licence folder
+                path = path_finder.find_product_post_licence_folder(
+                    path_builder.build_product_path(str(matches[0])),
+                    str(matches[0]))
+
+                submission_cms_path_dict[sub] = path if path is not None else ""
+
+            except FileNotFoundError:
+                submission_cms_path_dict[sub] = ""
+
 
         is_same_files_each_sub = Prompt.ask("[bold green]Would you like to upload the same files to every submission?[/bold green]", choices=["Yes", "No"], show_choices=True, case_sensitive=False, console=console)
 
+        # Handle the "same files" case first, getting source files once
         if is_same_files_each_sub.lower() == "yes":
-            root.attributes('-topmost', True)
-            source_files = filedialog.askopenfilenames(title=f"Select Files for All Submissions")
+            shared_source_files = filedialog.askopenfilenames(title="Select Files for All Submissions")
+        else:
+            shared_source_files = []
 
-            row = 2
+        # Single loop to process all submissions and their files
+        for sub in submissions:
+            # Determine the source files for the current submission
+            if is_same_files_each_sub.lower() == "no":
+                # If "different files," prompt for them inside the loop
+                source_files = filedialog.askopenfilenames(title=f"Select Files for Submission: {sub}")
+            else:
+                # If "same files," use the previously selected files
+                source_files = shared_source_files
 
-            for sub in submissions:
+            destination_path = submission_cms_path_dict.get(sub, "")
 
-                matches = re.findall(r"\b\d{6}", str(sub).lower())
-                try:
-                    # Look for post licence folder
-                    path = path_finder.find_product_post_licence_folder(
-                        path_builder.build_product_path(str(matches[0])),
-                        str(matches[0]))
+            # Write each file path to the workbook
+            for file_path in source_files:
+                ws.cell(row=row, column=1).value = sub
+                ws.cell(row=row, column=2).value = file_path
+                ws.cell(row=row, column=3).value = destination_path
+                row += 1
 
-                    submission_cms_path_dict[sub] = path if path is not None else ""
-
-                except FileNotFoundError:
-                    submission_cms_path_dict[sub] = ""
-                
-                for file_path in source_files:
-                    ws.cell(row=row, column=1).value = sub
-                    ws.cell(row=row, column=2).value = file_path
-                    ws.cell(row=row, column=3).value = submission_cms_path_dict[sub]
-                    row += 1
-            
-            wb.save(submissions_file_path)
-            return "success"
-
-        # else:
-        # Build the source paths for each submission
-
-        # If they dont iterate each submission and open the file dialog for each one
-        # Build the source paths for each submission
-
+        wb.save(submissions_file_path)
+        return "success"
 
 
     else:
