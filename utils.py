@@ -4,6 +4,8 @@ from typing import List, Dict
 from path_finder import PathFinder
 from map_path_builder import MapPathBuilder
 import re
+from enums import CMSPathTypes
+
 
 def prompt_from_numbered_list(console: Console, prompt_title: str, options: List[str]) -> str:
     """
@@ -37,7 +39,7 @@ def prompt_from_numbered_list(console: Console, prompt_title: str, options: List
     
     return selected_option
 
-def find_cms_paths_for_submissions(submissions: List[str]) -> Dict[str, str]:
+def find_cms_paths_for_submissions(submissions: List[str], path_type: str) -> Dict[str, str]:
     """
     Finds the CMS destination paths for a list of submissions.
 
@@ -71,8 +73,14 @@ def find_cms_paths_for_submissions(submissions: List[str]) -> Dict[str, str]:
         submission_id = str(matches[0])
         
         try:
+            path = None
+
             # Build the generic product path and then find the specific folder
-            path = path_finder.find_product_post_licence_folder(path_builder.build_product_path(submission_id), submission_id)
+            if path_type == CMSPathTypes.PRODUCT.value:
+                path = path_finder.find_product_folder(path_builder.build_product_path(submission_id), submission_id)
+
+            elif path_type == CMSPathTypes.PRODUCT_POST_LICENCE_FOLDER.value:
+                path = path_finder.find_product_post_licence_folder(path_builder.build_product_path(submission_id), submission_id)
             
             # Store the found path in the dictionary
             submission_cms_path_dict[sub] = path if path is not None else ""

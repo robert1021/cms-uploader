@@ -158,7 +158,7 @@ def handle_interactive_cms_path_builder(path_type: str, is_submissions_file_path
 
         # TODO: Only handles post licence path for now
 
-        submission_cms_path_dict = find_cms_paths_for_submissions(submissions)
+        submission_cms_path_dict = find_cms_paths_for_submissions(submissions, path_type)
 
         is_same_files_each_sub = Prompt.ask("[bold green]Would you like to upload the same files to every submission?[/bold green]", choices=["Yes", "No"], show_choices=True, case_sensitive=False, console=console)
 
@@ -188,7 +188,6 @@ def handle_interactive_cms_path_builder(path_type: str, is_submissions_file_path
                 row += 1
 
         wb.save(submissions_file_path)
-        return "success"
 
     else:
 
@@ -208,7 +207,7 @@ def handle_interactive_cms_path_builder(path_type: str, is_submissions_file_path
         ws.cell(row=1, column=2).value = CMSSubmissionsFileExcelColumns.SOURCE.value
         ws.cell(row=1, column=3).value = CMSSubmissionsFileExcelColumns.DESTINATION.value
 
-        submission_cms_path_dict = find_cms_paths_for_submissions(submissions)
+        submission_cms_path_dict = find_cms_paths_for_submissions(submissions, path_type)
 
         is_same_files_each_sub = Prompt.ask("[bold green]Would you like to upload the same files to every submission?[/bold green]", choices=["Yes", "No"], show_choices=True, case_sensitive=False, console=console)
 
@@ -238,7 +237,6 @@ def handle_interactive_cms_path_builder(path_type: str, is_submissions_file_path
                 row += 1
 
         wb.save("output.xlsx")
-
 
     return "success"
 
@@ -370,7 +368,8 @@ def run_app():
             results = handle_cms_path_builder(file_path_input, path_type_selection)
 
         elif tool_selection == CMSTools.INTERACTIVE_PATH_BUILDER.value:
-            path_type_selection = prompt_from_numbered_list(console, "Which type of path would you like to build?", CMSPathTypes.get_values())
+            path_types = [CMSPathTypes.PRODUCT.value, CMSPathTypes.PRODUCT_POST_LICENCE_FOLDER.value]
+            path_type_selection = prompt_from_numbered_list(console, "Which type of path would you like to build?", path_types)
             is_submissions_file_path = Prompt.ask(prompt="[bold green]Would you like to enter the path to the file containing submissions?[/bold green]", choices=["Yes", "No"], show_choices=True, case_sensitive=False, console=console)
             result = handle_interactive_cms_path_builder(path_type_selection, is_submissions_file_path, console)
 
