@@ -11,7 +11,8 @@ from rich.console import Console
 from rich.prompt import Prompt
 import tkinter as tk
 from tkinter import filedialog
-from utils import prompt_from_numbered_list
+from utils import prompt_from_numbered_list, find_cms_paths_for_submissions
+
 
 
 def handle_cms_path_builder(submissions_file_path: str, path_type: str) -> str:
@@ -124,6 +125,10 @@ def handle_cms_path_builder(submissions_file_path: str, path_type: str) -> str:
     return "success"
 
 def handle_interactive_cms_path_builder(path_type: str, is_submissions_file_path: str, console: Console) -> str:
+
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes('-topmost', True)
    
     if is_submissions_file_path.lower() == "yes":
         submissions_file_path = Prompt.ask("[bold green]Enter path to the file containing submissions[/bold green]", console=console)
@@ -137,9 +142,6 @@ def handle_interactive_cms_path_builder(path_type: str, is_submissions_file_path
         wb = openpyxl.load_workbook(submissions_file_path)
         ws = wb.active
 
-        path_builder = MapPathBuilder()
-        path_finder = PathFinder()
-
         submissions_col = ws.cell(row=1, column=1).value
         ws.cell(row=1, column=2).value = CMSSubmissionsFileExcelColumns.SOURCE.value
         ws.cell(row=1, column=3).value = CMSSubmissionsFileExcelColumns.DESTINATION.value
@@ -150,31 +152,13 @@ def handle_interactive_cms_path_builder(path_type: str, is_submissions_file_path
         if submissions_col.lower() != CMSSubmissionsFileExcelColumns.SUBMISSION.value.lower():
             return "error - excel file columns"
 
-        root = tk.Tk()
-        root.withdraw()
-        root.attributes('-topmost', True)
-
         submissions = [cell.value for cell in ws["A"][1:] if cell.value is not None]
 
-        submission_cms_path_dict = {}
         row = 2
 
         # TODO: Only handles post licence path for now
 
-        # Find the paths in CMS
-        for sub in submissions:
-            matches = re.findall(r"\b\d{6}", str(sub).lower())
-            try:
-                # Look for post licence folder
-                path = path_finder.find_product_post_licence_folder(
-                    path_builder.build_product_path(str(matches[0])),
-                    str(matches[0]))
-
-                submission_cms_path_dict[sub] = path if path is not None else ""
-
-            except FileNotFoundError:
-                submission_cms_path_dict[sub] = ""
-
+        submission_cms_path_dict = find_cms_paths_for_submissions(submissions)
 
         is_same_files_each_sub = Prompt.ask("[bold green]Would you like to upload the same files to every submission?[/bold green]", choices=["Yes", "No"], show_choices=True, case_sensitive=False, console=console)
 
@@ -206,9 +190,55 @@ def handle_interactive_cms_path_builder(path_type: str, is_submissions_file_path
         wb.save(submissions_file_path)
         return "success"
 
-
     else:
-        print("enter submission...")
+
+        user_submissions_str = Prompt.ask("[bold green]Enter submission ID(s) (comma-separated if multiple)[/bold green]", console=console)
+        submissions = [s.strip() for s in user_submissions_str.split(',') if s.strip()]
+        
+        if not submissions:
+            return "error - no submissions entered"
+
+        # Create a new workbook
+        wb = openpyxl.Workbook()
+        ws = wb.active
+
+        row = 2
+
+        ws.cell(row=1, column=1).value = CMSSubmissionsFileExcelColumns.SUBMISSION.value
+        ws.cell(row=1, column=2).value = CMSSubmissionsFileExcelColumns.SOURCE.value
+        ws.cell(row=1, column=3).value = CMSSubmissionsFileExcelColumns.DESTINATION.value
+
+        submission_cms_path_dict = find_cms_paths_for_submissions(submissions)
+
+        is_same_files_each_sub = Prompt.ask("[bold green]Would you like to upload the same files to every submission?[/bold green]", choices=["Yes", "No"], show_choices=True, case_sensitive=False, console=console)
+
+        # Handle the "same files" case first, getting source files once
+        if is_same_files_each_sub.lower() == "yes":
+            shared_source_files = filedialog.askopenfilenames(title="Select Files for All Submissions")
+        else:
+            shared_source_files = []
+
+        # Single loop to process all submissions and their files
+        for sub in submissions:
+            # Determine the source files for the current submission
+            if is_same_files_each_sub.lower() == "no":
+                # If "different files," prompt for them inside the loop
+                source_files = filedialog.askopenfilenames(title=f"Select Files for Submission: {sub}")
+            else:
+                # If "same files," use the previously selected files
+                source_files = shared_source_files
+
+            destination_path = submission_cms_path_dict.get(sub, "")
+
+            # Write each file path to the workbook
+            for file_path in source_files:
+                ws.cell(row=row, column=1).value = sub
+                ws.cell(row=row, column=2).value = file_path
+                ws.cell(row=row, column=3).value = destination_path
+                row += 1
+
+        wb.save("output.xlsx")
+
 
     return "success"
 
