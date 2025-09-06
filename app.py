@@ -3,8 +3,6 @@ import logging
 import re
 import openpyxl
 from enums import CMSPathTypes, CMSSubmissionsFileExcelColumns, CMSTools
-from path_finder import PathFinder
-from map_path_builder import MapPathBuilder
 import shutil
 from constants import DRIVE_LETTER, CMS_FOLDER
 from rich.console import Console
@@ -57,9 +55,6 @@ def handle_cms_path_builder(submissions_file_path: str, path_type: str) -> str:
     wb = openpyxl.load_workbook(submissions_file_path)
     ws = wb.active
 
-    path_builder = MapPathBuilder()
-    path_finder = PathFinder()
-
     submissions_col = ws.cell(row=1, column=1).value
     source_col = ws.cell(row=1, column=2).value
 
@@ -75,64 +70,12 @@ def handle_cms_path_builder(submissions_file_path: str, path_type: str) -> str:
 
     submission_cms_path_dict = find_cms_paths_for_submissions(submissions, path_type)
 
-    # row_count = 2
-
     min_row = 2
     for idx, row in enumerate(ws.iter_rows(min_row=min_row, max_col=2, values_only=True)):
         current_row_number = idx + min_row
         submission = row[0]
         destination_path = submission_cms_path_dict[submission]
         ws.cell(row=current_row_number, column=3).value = destination_path
-
-
-    # for row in ws.iter_rows(min_row=2, max_col=2, values_only=True):
-    #     if path_type == CMSPathTypes.PRODUCT.value:
-    #         matches = re.findall(r"\b\d{6}", str(row[0]).lower())
-    #         # File and submission number
-    #         if len(matches) == 2:
-    #             try:
-    #                 path = path_finder.find_product_folder(path_builder.build_product_path(str(matches[0])),
-    #                                                        str(matches[0]),
-    #                                                        str(matches[1]))
-    #                 ws.cell(row=row_count, column=3).value = path if path is not None else ""
-    #
-    #             except FileNotFoundError:
-    #                 ws.cell(row=row_count, column=3).value = ""
-    #
-    #         # File number only
-    #         elif len(matches) == 1:
-    #             try:
-    #                 path = path_finder.find_product_folder(path_builder.build_product_path(str(matches[0])),
-    #                                                        str(matches[0]))
-    #                 ws.cell(row=row_count, column=3).value = path if path is not None else ""
-    #
-    #             except FileNotFoundError:
-    #                 ws.cell(row=row_count, column=3).value = ""
-    #
-    #     elif path_type == CMSPathTypes.PRODUCT_POST_LICENCE_FOLDER.value:
-    #         matches = re.findall(r"\b\d{6}", str(row[0]).lower())
-    #         try:
-    #             # Look for post licence folder
-    #             path = path_finder.find_product_post_licence_folder(
-    #                 path_builder.build_product_path(str(matches[0])),
-    #                 str(matches[0]))
-    #             ws.cell(row=row_count, column=3).value = path if path is not None else ""
-    #
-    #         except FileNotFoundError:
-    #             ws.cell(row=row_count, column=3).value = ""
-    #
-    #     elif path_type == "Site" or path_type == "Foreign Site":
-    #         return "error"
-    #     elif path_type == "Trading Partner":
-    #         return "error"
-    #     elif path_type == "Clinical Trial":
-    #         return "error"
-    #     elif path_type == "Company":
-    #         return "error"
-    #     elif path_type == "Master File":
-    #         return "error"
-    #
-    #     row_count += 1
 
     wb.save(submissions_file_path)
     return "success"
@@ -311,6 +254,15 @@ def handle_bulk_uploader(file_path: str, generate_log_file: bool, create_missing
                 logging.info(f"Working on copying {row[1]} to {row[2]}")
 
             source_file = os.path.basename(row[1])
+            file_name_part, file_extension = os.path.splitext(source_file)
+            # Use regex to remove ' (number)' from the end of the file name part
+            # The `$` ensures it only matches at the very end of the string.
+            cleaned_file_name = re.sub(r' \(\d+\)$', '', file_name_part)
+            # Re-assemble the new, cleaned filename
+            new_dest_filename = cleaned_file_name + file_extension
+            # Create the full destination path with the new filename
+            full_dest_path = os.path.join(row[2], new_dest_filename)
+
             # Check if row destination is empty
             if row[2] is None:
                 print("Row destination is empty! Skipping...")
@@ -328,7 +280,7 @@ def handle_bulk_uploader(file_path: str, generate_log_file: bool, create_missing
                     # Create the necessary directories (destination)
                     os.makedirs(row[2])
                     # Copy source file to the destination
-                    shutil.copy2(row[1], row[2])
+                    shutil.copy2(row[1], full_dest_path)
                     print("Created missing path and copied file to it!")
                     if generate_log_file:
                         logging.info("Created missing path and copied file to it!")
@@ -340,9 +292,9 @@ def handle_bulk_uploader(file_path: str, generate_log_file: bool, create_missing
                         logging.info("Skipping...")
 
             # Check CMS to see if the source file already exists at the destination
-            elif not os.path.exists(os.path.join(row[2], source_file)):
+            elif not os.path.exists(full_dest_path):
                 # Copy source file to the destination
-                shutil.copy2(row[1], row[2])
+                shutil.copy2(row[1], full_dest_path)
                 print("File copied successfully!")
                 if generate_log_file:
                     logging.info("File copied successfully!")
