@@ -27,7 +27,7 @@ def handle_cms_path_builder(submissions_file_path: str, path_type: str) -> str:
        - "success": CMS path building was successful.
        - "error - file path": The provided file path is invalid.
        - "error - invalid cms path type": The provided CMS path type is invalid.
-       - "error - excel file columns": The columns in the Excel file are invalid.
+       - "error - Excel file columns": The columns in the Excel file are invalid.
        - "error - cms path": The CMS path is invalid.
    """
 
@@ -71,55 +71,68 @@ def handle_cms_path_builder(submissions_file_path: str, path_type: str) -> str:
 
     ws.cell(row=1, column=3).value = CMSSubmissionsFileExcelColumns.DESTINATION.value
 
-    row_count = 2
-    for row in ws.iter_rows(min_row=2, max_col=2, values_only=True):
-        if path_type == CMSPathTypes.PRODUCT.value:
-            matches = re.findall(r"\b\d{6}", str(row[0]).lower())
-            # File and submission number
-            if len(matches) == 2:
-                try:
-                    path = path_finder.find_product_folder(path_builder.build_product_path(str(matches[0])),
-                                                           str(matches[0]),
-                                                           str(matches[1]))
-                    ws.cell(row=row_count, column=3).value = path if path is not None else ""
+    submissions = [cell.value for cell in ws["A"][1:] if cell.value is not None]
 
-                except FileNotFoundError:
-                    ws.cell(row=row_count, column=3).value = ""
+    submission_cms_path_dict = find_cms_paths_for_submissions(submissions, path_type)
 
-            # File number only
-            elif len(matches) == 1:
-                try:
-                    path = path_finder.find_product_folder(path_builder.build_product_path(str(matches[0])),
-                                                           str(matches[0]))
-                    ws.cell(row=row_count, column=3).value = path if path is not None else ""
+    # row_count = 2
 
-                except FileNotFoundError:
-                    ws.cell(row=row_count, column=3).value = ""
+    min_row = 2
+    for idx, row in enumerate(ws.iter_rows(min_row=min_row, max_col=2, values_only=True)):
+        current_row_number = idx + min_row
+        submission = row[0]
+        destination_path = submission_cms_path_dict[submission]
+        ws.cell(row=current_row_number, column=3).value = destination_path
 
-        elif path_type == CMSPathTypes.PRODUCT_POST_LICENCE_FOLDER.value:
-            matches = re.findall(r"\b\d{6}", str(row[0]).lower())
-            try:
-                # Look for post licence folder
-                path = path_finder.find_product_post_licence_folder(
-                    path_builder.build_product_path(str(matches[0])),
-                    str(matches[0]))
-                ws.cell(row=row_count, column=3).value = path if path is not None else ""
 
-            except FileNotFoundError:
-                ws.cell(row=row_count, column=3).value = ""
-
-        elif path_type == "Site" or path_type == "Foreign Site":
-            return "error"
-        elif path_type == "Trading Partner":
-            return "error"
-        elif path_type == "Clinical Trial":
-            return "error"
-        elif path_type == "Company":
-            return "error"
-        elif path_type == "Master File":
-            return "error"
-
-        row_count += 1
+    # for row in ws.iter_rows(min_row=2, max_col=2, values_only=True):
+    #     if path_type == CMSPathTypes.PRODUCT.value:
+    #         matches = re.findall(r"\b\d{6}", str(row[0]).lower())
+    #         # File and submission number
+    #         if len(matches) == 2:
+    #             try:
+    #                 path = path_finder.find_product_folder(path_builder.build_product_path(str(matches[0])),
+    #                                                        str(matches[0]),
+    #                                                        str(matches[1]))
+    #                 ws.cell(row=row_count, column=3).value = path if path is not None else ""
+    #
+    #             except FileNotFoundError:
+    #                 ws.cell(row=row_count, column=3).value = ""
+    #
+    #         # File number only
+    #         elif len(matches) == 1:
+    #             try:
+    #                 path = path_finder.find_product_folder(path_builder.build_product_path(str(matches[0])),
+    #                                                        str(matches[0]))
+    #                 ws.cell(row=row_count, column=3).value = path if path is not None else ""
+    #
+    #             except FileNotFoundError:
+    #                 ws.cell(row=row_count, column=3).value = ""
+    #
+    #     elif path_type == CMSPathTypes.PRODUCT_POST_LICENCE_FOLDER.value:
+    #         matches = re.findall(r"\b\d{6}", str(row[0]).lower())
+    #         try:
+    #             # Look for post licence folder
+    #             path = path_finder.find_product_post_licence_folder(
+    #                 path_builder.build_product_path(str(matches[0])),
+    #                 str(matches[0]))
+    #             ws.cell(row=row_count, column=3).value = path if path is not None else ""
+    #
+    #         except FileNotFoundError:
+    #             ws.cell(row=row_count, column=3).value = ""
+    #
+    #     elif path_type == "Site" or path_type == "Foreign Site":
+    #         return "error"
+    #     elif path_type == "Trading Partner":
+    #         return "error"
+    #     elif path_type == "Clinical Trial":
+    #         return "error"
+    #     elif path_type == "Company":
+    #         return "error"
+    #     elif path_type == "Master File":
+    #         return "error"
+    #
+    #     row_count += 1
 
     wb.save(submissions_file_path)
     return "success"

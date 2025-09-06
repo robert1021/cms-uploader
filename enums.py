@@ -24,6 +24,7 @@ class CMSFolders(BaseEnum):
 class CMSPathTypes(BaseEnum):
     PRODUCT = "Product"
     PRODUCT_POST_LICENCE_FOLDER = "Product - Post Licence Folder"
+    PRODUCT_CORRESPONDENCE_GENERAL_FOLDER = "Product - Correspondence General"
     SITE = "Site"
     FOREIGN_SITE = "Foreign Site"
     TRADING_PARTNER = "Trading Partner"

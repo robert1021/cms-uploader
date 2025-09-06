@@ -73,3 +73,22 @@ class PathFinder:
                     return os.path.join(file_path, folder)
         # Post Licence folder not found - Create path based on pattern
         return os.path.join(file_path, POST_LICENCE_FOLDER_NAME)
+
+    def find_product_correspondence_general_folder(self, range_path: str, file_number: str):
+        """
+        Finds the Correspondence General product folder based on the given parameters.
+
+        :param range_path: The path of the range.
+        :param file_number: The file number.
+
+        :return: The path to the Correspondence General folder.
+        """
+        # TODO: This needs to be tested. Not ready for prod
+        file_path = self.find_product_folder(range_path, file_number)
+        if os.path.isdir(file_path):
+            for folder in os.listdir(file_path):
+                if CORRESPONDENCE_GENERAL_FOLDER_NAME.lower() in folder.lower():
+                    return os.path.join(file_path, folder)
+        # Correspondence General folder not found - Create path based on pattern
+        return os.path.join(file_path, CORRESPONDENCE_GENERAL_FOLDER_NAME)
+        

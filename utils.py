@@ -81,7 +81,9 @@ def find_cms_paths_for_submissions(submissions: List[str], path_type: str) -> Di
 
             elif path_type == CMSPathTypes.PRODUCT_POST_LICENCE_FOLDER.value:
                 path = path_finder.find_product_post_licence_folder(path_builder.build_product_path(submission_id), submission_id)
-            
+
+            elif path_type == CMSPathTypes.PRODUCT_CORRESPONDENCE_GENERAL_FOLDER.value:
+                path = path_finder.find_product_correspondence_general_folder(path_builder.build_product_path(submission_id), submission_id)
             # Store the found path in the dictionary
             submission_cms_path_dict[sub] = path if path is not None else ""
             
