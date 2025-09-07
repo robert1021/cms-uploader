@@ -9,7 +9,7 @@ from rich.console import Console
 from rich.prompt import Prompt
 import tkinter as tk
 from tkinter import filedialog
-from utils import prompt_from_numbered_list, find_cms_paths_for_submissions
+from utils import prompt_from_numbered_list, find_cms_paths_for_submissions, clean_filename
 
 
 
@@ -209,7 +209,7 @@ def handle_bulk_uploader(file_path: str, generate_log_file: bool, create_missing
         Possible return values:
         - "success": Bulk uploading was successful.
         - "error - file path": The provided file path is invalid.
-        - "error - excel file columns": The columns in the Excel file are invalid.
+        - "error - Excel file columns": The columns in the Excel file are invalid.
         - "error - cms path": The CMS path is invalid.
     """
     if not os.path.isfile(file_path):
@@ -254,14 +254,9 @@ def handle_bulk_uploader(file_path: str, generate_log_file: bool, create_missing
                 logging.info(f"Working on copying {row[1]} to {row[2]}")
 
             source_file = os.path.basename(row[1])
-            file_name_part, file_extension = os.path.splitext(source_file)
-            # Use regex to remove ' (number)' from the end of the file name part
-            # The `$` ensures it only matches at the very end of the string.
-            cleaned_file_name = re.sub(r' \(\d+\)$', '', file_name_part)
-            # Re-assemble the new, cleaned filename
-            new_dest_filename = cleaned_file_name + file_extension
+            cleaned_file_name = clean_filename(source_file)
             # Create the full destination path with the new filename
-            full_dest_path = os.path.join(row[2], new_dest_filename)
+            full_dest_path = os.path.join(row[2], cleaned_file_name)
 
             # Check if row destination is empty
             if row[2] is None:

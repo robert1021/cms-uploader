@@ -5,6 +5,7 @@ from path_finder import PathFinder
 from map_path_builder import MapPathBuilder
 import re
 from enums import CMSPathTypes
+import os
 
 
 def prompt_from_numbered_list(console: Console, prompt_title: str, options: List[str]) -> str:
@@ -92,3 +93,23 @@ def find_cms_paths_for_submissions(submissions: List[str], path_type: str) -> Di
             submission_cms_path_dict[sub] = ""
             
     return submission_cms_path_dict
+
+
+def clean_filename(filename: str) -> str:
+    """
+    Removes a trailing ' (number)' suffix from a filename.
+
+    For example, 'My Report (1).pdf' becomes 'My Report.pdf'.
+
+    :param filename: The input filename string.
+    :return: The cleaned filename string.
+    """
+    # Separate the filename from its extension (e.g., 'My Report (1)', '.pdf')
+    name_part, extension = os.path.splitext(filename)
+
+    # Use a regular expression to find and replace the pattern at the end of the name
+    # r' \(\d+\)$' looks for: a space, '(', one or more digits, ')' at the end ($)
+    cleaned_name_part = re.sub(r' \(\d+\)$', '', name_part)
+
+    # Rejoin the cleaned name with the original extension
+    return cleaned_name_part + extension
