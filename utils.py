@@ -4,8 +4,9 @@ from typing import List, Dict
 from path_finder import PathFinder
 from map_path_builder import MapPathBuilder
 import re
-from enums import CMSPathTypes
+from enums import CMSPathTypes, SubmissionsFileExcelColumns
 import os
+from constants import DRIVE_LETTER, CMS_FOLDER, Y_DRIVE_PATH
 
 
 def prompt_from_numbered_list(console: Console, prompt_title: str, options: List[str]) -> str:
@@ -113,3 +114,88 @@ def clean_filename(filename: str) -> str:
 
     # Rejoin the cleaned name with the original extension
     return cleaned_name_part + extension
+
+def is_valid_file_path(file_path):
+    """Checks if a given path is a valid file."""
+    return os.path.isfile(file_path)
+
+def is_xlsx_file(file_path):
+    """Checks if a file has a .xlsx extension."""
+    return file_path.endswith(".xlsx")
+
+def is_connected_to_vpn():
+    """Checks if connected to VPN."""
+    return os.path.exists(Y_DRIVE_PATH)
+
+def is_connected_to_cms():
+    cms_path = os.path.join(DRIVE_LETTER, CMS_FOLDER)
+    return os.path.isdir(cms_path)
+
+def is_valid_directory(directory_path):
+    """Checks if a given path is a valid directory."""
+    return os.path.isdir(directory_path)
+
+def validate_bulk_uploader_excel_columns(submissions_col, source_col, dest_col):
+    """
+    Checks if the given column names match the expected enum values, ignoring case.
+
+    Args:
+        submissions_col (str): The name of the submission column.
+        source_col (str): The name of the source column.
+        dest_col (str): The name of the destination column.
+
+    Returns:
+        bool: True if all column names match the expected values, otherwise False.
+    """
+    if (submissions_col.lower() != SubmissionsFileExcelColumns.SUBMISSION.value.lower() or
+            source_col.lower() != SubmissionsFileExcelColumns.SOURCE.value.lower() or
+            dest_col.lower() != SubmissionsFileExcelColumns.DESTINATION.value.lower()):
+        return False
+    return True
+
+def validate_path_builder_excel_columns(submissions_col, source_col):
+    """
+    Checks if the given column names match the expected enum values, ignoring case.
+
+    Args:
+        submissions_col (str): The name of the submission column.
+        source_col (str): The name of the source column.
+
+    Returns:
+        bool: True if both column names match the expected values, otherwise False.
+    """
+    if (submissions_col.lower() != SubmissionsFileExcelColumns.SUBMISSION.value.lower() or
+            source_col.lower() != SubmissionsFileExcelColumns.SOURCE.value.lower()):
+        return False
+    return True
+
+def validate_interactive_path_builder_excel_column(submissions_col):
+    """
+    Checks if the given column names match the expected enum values, ignoring case.
+
+    Args:
+        submissions_col (str): The name of the submission column.
+
+    Returns:
+        bool: True if the name matches the expected value, otherwise False.
+    """
+    if submissions_col.lower() != SubmissionsFileExcelColumns.SUBMISSION.value.lower():
+        return False
+    return True
+
+def get_non_empty_column_values(worksheet, column_letter):
+    """
+    Retrieves a list of non-empty cell values from a specified column of a worksheet.
+
+    Args:
+        worksheet: The worksheet object (e.g., from openpyxl).
+        column_letter (str): The letter of the column to retrieve values from (e.g., "A", "B").
+
+    Returns:
+        list: A list of all non-None cell values in the specified column, starting from the second row.
+    """
+    # Build the cell range string, e.g., "A[1:]"
+    column_range = worksheet[column_letter][1:]
+
+    # Use a list comprehension to get non-empty values
+    return [cell.value for cell in column_range if cell.value is not None]

@@ -1,15 +1,10 @@
-import os
 import logging
-import re
 import openpyxl
-from enums import CMSPathTypes, CMSSubmissionsFileExcelColumns, CMSTools
+from enums import CMSTools
 import shutil
-from constants import DRIVE_LETTER, CMS_FOLDER
-from rich.console import Console
-from rich.prompt import Prompt
 import tkinter as tk
 from tkinter import filedialog
-from utils import prompt_from_numbered_list, find_cms_paths_for_submissions, clean_filename
+from utils import *
 
 
 
@@ -32,25 +27,14 @@ def handle_cms_path_builder(submissions_file_path: str, path_type: str) -> str:
     if not os.path.isfile(submissions_file_path):
         return "error - file path"
 
-    if not submissions_file_path.endswith(".xlsx"):
-        return "error - file path"
+    if not is_xlsx_file(submissions_file_path):
+        return "error - file path not xlsx"
 
-    if not os.path.exists("Y:\\HC"):
+    if not is_connected_to_vpn():
         return "error - not connected to vpn and oes"
 
-    cms_path = os.path.join(DRIVE_LETTER, CMS_FOLDER)
-    if not os.path.isdir(cms_path):
+    if not is_connected_to_cms():
         return "error - cms path"
-
-    valid_path_type = False
-
-    for item in CMSPathTypes:
-        if item.value == path_type:
-            valid_path_type = True
-            break
-
-    if not valid_path_type:
-        return "error - invalid cms path type"
 
     wb = openpyxl.load_workbook(submissions_file_path)
     ws = wb.active
@@ -58,15 +42,12 @@ def handle_cms_path_builder(submissions_file_path: str, path_type: str) -> str:
     submissions_col = ws.cell(row=1, column=1).value
     source_col = ws.cell(row=1, column=2).value
 
-    if submissions_col is None or source_col is None:
+    if not validate_path_builder_excel_columns(submissions_col, source_col):
         return "error - excel file columns"
 
-    if submissions_col.lower() != CMSSubmissionsFileExcelColumns.SUBMISSION.value.lower() or source_col.lower() != CMSSubmissionsFileExcelColumns.SOURCE.value.lower():
-        return "error - excel file columns"
+    ws.cell(row=1, column=3).value = SubmissionsFileExcelColumns.DESTINATION.value
 
-    ws.cell(row=1, column=3).value = CMSSubmissionsFileExcelColumns.DESTINATION.value
-
-    submissions = [cell.value for cell in ws["A"][1:] if cell.value is not None]
+    submissions = get_non_empty_column_values(ws, "A")
 
     submission_cms_path_dict = find_cms_paths_for_submissions(submissions, path_type)
 
@@ -92,27 +73,22 @@ def handle_interactive_cms_path_builder(path_type: str, is_submissions_file_path
         if not os.path.isfile(submissions_file_path):
             return "error - file path"
 
-        if not submissions_file_path.endswith(".xlsx"):
-            return "error - file path"
+        if not is_xlsx_file(submissions_file_path):
+            return "error - file path not xlsx"
 
         wb = openpyxl.load_workbook(submissions_file_path)
         ws = wb.active
 
         submissions_col = ws.cell(row=1, column=1).value
-        ws.cell(row=1, column=2).value = CMSSubmissionsFileExcelColumns.SOURCE.value
-        ws.cell(row=1, column=3).value = CMSSubmissionsFileExcelColumns.DESTINATION.value
+        ws.cell(row=1, column=2).value = SubmissionsFileExcelColumns.SOURCE.value
+        ws.cell(row=1, column=3).value = SubmissionsFileExcelColumns.DESTINATION.value
 
-        if submissions_col is None:
+        if not validate_interactive_path_builder_excel_column(submissions_col):
             return "error - excel file columns"
 
-        if submissions_col.lower() != CMSSubmissionsFileExcelColumns.SUBMISSION.value.lower():
-            return "error - excel file columns"
-
-        submissions = [cell.value for cell in ws["A"][1:] if cell.value is not None]
+        submissions = get_non_empty_column_values(ws, "A")
 
         row = 2
-
-        # TODO: Only handles post licence path for now
 
         submission_cms_path_dict = find_cms_paths_for_submissions(submissions, path_type)
 
@@ -159,9 +135,9 @@ def handle_interactive_cms_path_builder(path_type: str, is_submissions_file_path
 
         row = 2
 
-        ws.cell(row=1, column=1).value = CMSSubmissionsFileExcelColumns.SUBMISSION.value
-        ws.cell(row=1, column=2).value = CMSSubmissionsFileExcelColumns.SOURCE.value
-        ws.cell(row=1, column=3).value = CMSSubmissionsFileExcelColumns.DESTINATION.value
+        ws.cell(row=1, column=1).value = SubmissionsFileExcelColumns.SUBMISSION.value
+        ws.cell(row=1, column=2).value = SubmissionsFileExcelColumns.SOURCE.value
+        ws.cell(row=1, column=3).value = SubmissionsFileExcelColumns.DESTINATION.value
 
         submission_cms_path_dict = find_cms_paths_for_submissions(submissions, path_type)
 
@@ -215,14 +191,13 @@ def handle_bulk_uploader(file_path: str, generate_log_file: bool, create_missing
     if not os.path.isfile(file_path):
         return "error - file path"
 
-    if not file_path.endswith(".xlsx"):
-        return "error - file path"
+    if not is_xlsx_file(file_path):
+        return "error - file path not xlsx"
 
-    if not os.path.exists("Y:\\HC"):
+    if not is_connected_to_vpn():
         return "error - not connected to vpn and oes"
 
-    cms_path = os.path.join(DRIVE_LETTER, CMS_FOLDER)
-    if not os.path.isdir(cms_path):
+    if not is_connected_to_cms():
         return "error - cms path"
 
     wb = openpyxl.load_workbook(file_path)
@@ -232,12 +207,7 @@ def handle_bulk_uploader(file_path: str, generate_log_file: bool, create_missing
     source_col = ws.cell(row=1, column=2).value
     dest_col = ws.cell(row=1, column=3).value
 
-    if submissions_col is None or source_col is None or dest_col is None:
-        return "error - excel file columns"
-
-    if (submissions_col.lower() != CMSSubmissionsFileExcelColumns.SUBMISSION.value.lower() or
-            source_col.lower() != CMSSubmissionsFileExcelColumns.SOURCE.value.lower() or
-            dest_col.lower() != CMSSubmissionsFileExcelColumns.DESTINATION.value.lower()):
+    if not validate_bulk_uploader_excel_columns(submissions_col, source_col, dest_col):
         return "error - excel file columns"
 
     # Configure the logger
@@ -320,12 +290,12 @@ def run_app():
             CMSTools.get_values()
         )
 
-        results = ""
+        result = ""
 
         if tool_selection == CMSTools.PATH_BUILDER.value:
             file_path_input = Prompt.ask("[bold green]Enter path to the file containing submissions[/bold green]", console=console)
             path_type_selection = prompt_from_numbered_list(console, "Which type of path would you like to build?", CMSPathTypes.get_values())
-            results = handle_cms_path_builder(file_path_input, path_type_selection)
+            result = handle_cms_path_builder(file_path_input, path_type_selection)
 
         elif tool_selection == CMSTools.INTERACTIVE_PATH_BUILDER.value:
             path_types = [CMSPathTypes.PRODUCT.value, CMSPathTypes.PRODUCT_POST_LICENCE_FOLDER.value]
@@ -335,9 +305,9 @@ def run_app():
 
         elif tool_selection == CMSTools.BULK_UPLOADER.value:
             file_path_input = Prompt.ask("[bold green]Enter path to the file containing submissions, along with their source and destination information[/bold green]", console=console)
-            results = handle_bulk_uploader(file_path_input, True, True)
+            result = handle_bulk_uploader(file_path_input, True, True)
 
-        console.print(f"{results}", style="bold green")
+        console.print(f"{result}", style="bold green")
         run_another_input = Prompt.ask(prompt="[bold blue]Would you like to run another tool?[/bold blue]", choices=["Yes", "No"], show_choices=True, case_sensitive=False, console=console)
 
         if run_another_input.lower() == "no":

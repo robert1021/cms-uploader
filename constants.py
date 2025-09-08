@@ -1,4 +1,5 @@
 DRIVE_LETTER = "Z:\\"
+Y_DRIVE_PATH = "Y:\\HC"
 CMS_FOLDER = "NHP-OS - SD-PSN"
 APPLICATION_WORKBOOKS = "Application Workbooks"
 SUBMISSIONS = "Submissions"

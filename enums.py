@@ -33,7 +33,7 @@ class CMSPathTypes(BaseEnum):
     MASTER_FILE = "Master File"
 
 
-class CMSSubmissionsFileExcelColumns(BaseEnum):
+class SubmissionsFileExcelColumns(BaseEnum):
     SUBMISSION = "Submission"
     SOURCE = "Source"
     DESTINATION = "Destination"
