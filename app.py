@@ -1,6 +1,7 @@
 import logging
 import openpyxl
-from enums import CMSTools
+from enums import CMSTools, CMSPathTypes
+from path_finder import PathFinder
 import shutil
 import tkinter as tk
 from tkinter import filedialog
@@ -49,7 +50,8 @@ def handle_cms_path_builder(submissions_file_path: str, path_type: str) -> str:
 
     submissions = get_non_empty_column_values(ws, "A")
 
-    submission_cms_path_dict = find_cms_paths_for_submissions(submissions, path_type)
+    cms_path_finder = PathFinder()
+    submission_cms_path_dict = cms_path_finder.find_cms_paths_for_submissions(submissions, path_type)
 
     min_row = 2
     for idx, row in enumerate(ws.iter_rows(min_row=min_row, max_col=2, values_only=True)):
@@ -66,6 +68,7 @@ def handle_interactive_cms_path_builder(path_type: str, is_submissions_file_path
     root = tk.Tk()
     root.withdraw()
     root.attributes('-topmost', True)
+    cms_path_finder = PathFinder()
    
     if is_submissions_file_path.lower() == "yes":
         submissions_file_path = Prompt.ask("[bold green]Enter path to the file containing submissions[/bold green]", console=console)
@@ -90,7 +93,7 @@ def handle_interactive_cms_path_builder(path_type: str, is_submissions_file_path
 
         row = 2
 
-        submission_cms_path_dict = find_cms_paths_for_submissions(submissions, path_type)
+        submission_cms_path_dict = cms_path_finder.find_cms_paths_for_submissions(submissions, path_type)
 
         is_same_files_each_sub = Prompt.ask("[bold green]Would you like to upload the same files to every submission?[/bold green]", choices=["Yes", "No"], show_choices=True, case_sensitive=False, console=console)
 
@@ -139,7 +142,7 @@ def handle_interactive_cms_path_builder(path_type: str, is_submissions_file_path
         ws.cell(row=1, column=2).value = SubmissionsFileExcelColumns.SOURCE.value
         ws.cell(row=1, column=3).value = SubmissionsFileExcelColumns.DESTINATION.value
 
-        submission_cms_path_dict = find_cms_paths_for_submissions(submissions, path_type)
+        submission_cms_path_dict = cms_path_finder.find_cms_paths_for_submissions(submissions, path_type)
 
         is_same_files_each_sub = Prompt.ask("[bold green]Would you like to upload the same files to every submission?[/bold green]", choices=["Yes", "No"], show_choices=True, case_sensitive=False, console=console)
 

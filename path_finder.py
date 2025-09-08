@@ -1,6 +1,9 @@
 import os
-from enums import CMSFolders
+from enums import CMSFolders, CMSPathTypes
 from constants import *
+from typing import List, Dict
+import re
+from map_path_builder import MapPathBuilder
 
 
 class PathFinder:
@@ -83,7 +86,6 @@ class PathFinder:
 
         :return: The path to the Correspondence General folder.
         """
-        # TODO: This needs to be tested. Not ready for prod
         file_path = self.find_product_folder(range_path, file_number)
         if os.path.isdir(file_path):
             for folder in os.listdir(file_path):
@@ -91,4 +93,60 @@ class PathFinder:
                     return os.path.join(file_path, folder)
         # Correspondence General folder not found - Create path based on pattern
         return os.path.join(file_path, CORRESPONDENCE_GENERAL_FOLDER_NAME)
+
+    def find_cms_paths_for_submissions(self, submissions: List[str], path_type: str) -> Dict[str, str]:
+        """
+        Finds the CMS destination paths for a list of submissions.
+
+        This function extracts a 6-digit submission ID from each submission string,
+        then uses the path_builder and path_finder objects to locate
+        the corresponding CMS folder. It handles cases where a path is not found.
+
+        Args:
+            submissions (List[str]): A list of submission strings to process.
+
+        Returns:
+            Dict[str, str]: A dictionary mapping each submission string to its
+                            found CMS path. If a path is not found, the value
+                            is an empty string.
+        """
+
+        path_builder = MapPathBuilder()
+        submission_cms_path_dict = {}
+
+        # Iterate through each submission to find its CMS path
+        for sub in submissions:
+            # Use regex to find a 6-digit number, assuming it's the product ID
+            matches = re.findall(r"\b\d{6}", str(sub).lower())
+
+            # Ensure a submission ID was found
+            if not matches:
+                submission_cms_path_dict[sub] = ""
+                continue
+
+            submission_id = str(matches[0])
+
+            try:
+                path = None
+
+                # Build the generic product path and then find the specific folder
+                if path_type == CMSPathTypes.PRODUCT.value:
+                    path = self.find_product_folder(path_builder.build_product_path(submission_id),
+                                                           submission_id)
+
+                elif path_type == CMSPathTypes.PRODUCT_POST_LICENCE_FOLDER.value:
+                    path = self.find_product_post_licence_folder(path_builder.build_product_path(submission_id),
+                                                                        submission_id)
+
+                elif path_type == CMSPathTypes.PRODUCT_CORRESPONDENCE_GENERAL_FOLDER.value:
+                    path = self.find_product_correspondence_general_folder(
+                        path_builder.build_product_path(submission_id), submission_id)
+                # Store the found path in the dictionary
+                submission_cms_path_dict[sub] = path if path is not None else ""
+
+            except FileNotFoundError:
+                # If the product ID or path is not found, store an empty string
+                submission_cms_path_dict[sub] = ""
+
+        return submission_cms_path_dict
         
