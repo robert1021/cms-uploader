@@ -6,6 +6,19 @@ import shutil
 import tkinter as tk
 from tkinter import filedialog
 from utils import *
+from config import *
+
+
+def handle_connect_to_cms(username: str, password: str):
+    if is_connected_to_cms():
+        return "Already connected to CMS"
+
+    result = map_network_drive(CMS_TARGET_DRIVE, CMS_NETWORK_PATH, username=username, password=password)
+
+    if not result:
+        return "Failed to connect to CMS"
+
+    return "success"
 
 
 
@@ -295,7 +308,14 @@ def run_app():
 
         result = ""
 
-        if tool_selection == CMSTools.PATH_BUILDER.value:
+        if tool_selection == CMSTools.CONNECT_TO_CMS.value:
+
+            username = Prompt.ask("[bold green]Enter username[/bold green]", console=console)
+            password = Prompt.ask("[bold green]Enter password[/bold green]", console=console)
+
+            result = handle_connect_to_cms(username, password)
+
+        elif tool_selection == CMSTools.PATH_BUILDER.value:
             file_path_input = Prompt.ask("[bold green]Enter path to the file containing submissions[/bold green]", console=console)
             path_type_selection = prompt_from_numbered_list(console, "Which type of path would you like to build?", CMSPathTypes.get_values())
             result = handle_cms_path_builder(file_path_input, path_type_selection)

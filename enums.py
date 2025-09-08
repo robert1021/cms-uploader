@@ -40,6 +40,7 @@ class SubmissionsFileExcelColumns(BaseEnum):
 
 
 class CMSTools(BaseEnum):
+    CONNECT_TO_CMS = "Connect to CMS"
     PATH_BUILDER = "Path Builder"
     BULK_UPLOADER = "Bulk Uploader"
     INTERACTIVE_PATH_BUILDER = "Interactive Path Builder"

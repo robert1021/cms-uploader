@@ -5,6 +5,7 @@ import re
 from enums import SubmissionsFileExcelColumns
 import os
 from constants import DRIVE_LETTER, CMS_FOLDER, Y_DRIVE_PATH
+import subprocess
 
 
 def prompt_from_numbered_list(console: Console, prompt_title: str, options: List[str]) -> str:
@@ -142,3 +143,48 @@ def get_non_empty_column_values(worksheet, column_letter):
 
     # Use a list comprehension to get non-empty values
     return [cell.value for cell in column_range if cell.value is not None]
+
+def map_network_drive(drive_letter, network_path, username=None, password=None):
+    """
+    Maps a network share to a local drive letter using the 'net use' command.
+
+    Args:
+        drive_letter (str): The local drive letter to use (e.g., 'Z:').
+        network_path (str): The UNC path to the network share (e.g., '\\\\ServerName\\ShareName').
+        username (str, optional): Username for authentication, if required.
+        password (str, optional): Password for authentication, if required.
+
+    Returns:
+        bool: True if the mapping was successful, False otherwise.
+    """
+    try:
+        # 1. Start with the base command to map the drive
+        command = f"net use {drive_letter} {network_path}"
+
+        # 2. Add authentication details if provided
+        if username and password:
+            command += f" {password} /user:{username}"
+        # 3. Add '/persistent:no' to ensure the map is not retained after reboot
+        command += " /persistent:no"
+
+        # Execute the command and capture output
+        result = subprocess.run(
+            command,
+            shell=True,
+            check=True,  # Raise an exception for non-zero exit codes
+            capture_output=True,
+            text=True
+        )
+
+        # Success is usually indicated by a zero return code
+        print(f"Successfully mapped {network_path} to {drive_letter}")
+        print("Output:", result.stdout.strip())
+        return True
+
+    except subprocess.CalledProcessError as e:
+        # Handle cases where the command fails (e.g., invalid path, wrong credentials)
+        print(f"Error mapping drive: {e.stderr.strip()}")
+        return False
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        return False
