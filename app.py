@@ -22,7 +22,7 @@ def handle_connect_to_cms(username: str, password: str):
 
 
 
-def handle_cms_path_builder(submissions_file_path: str, path_type: str) -> str:
+def handle_cms_path_builder(submissions_file_path: str, path_type: str, console=None) -> str:
     """
    Handle building CMS (Content Management System) paths based on the provided submissions file and path type.
 
@@ -64,14 +64,15 @@ def handle_cms_path_builder(submissions_file_path: str, path_type: str) -> str:
     submissions = get_non_empty_column_values(ws, "A")
 
     cms_path_finder = PathFinder()
-    submission_cms_path_dict = cms_path_finder.find_cms_paths_for_submissions(submissions, path_type)
+    submission_cms_path_dict = cms_path_finder.find_cms_paths_for_submissions(submissions, path_type, console=console)
 
     min_row = 2
     for idx, row in enumerate(ws.iter_rows(min_row=min_row, max_col=2, values_only=True)):
         current_row_number = idx + min_row
         submission = row[0]
-        destination_path = submission_cms_path_dict[submission]
-        ws.cell(row=current_row_number, column=3).value = destination_path
+        if submission:
+            destination_path = submission_cms_path_dict[submission]
+            ws.cell(row=current_row_number, column=3).value = destination_path
 
     wb.save(submissions_file_path)
     return "success"
@@ -318,7 +319,7 @@ def run_app():
         elif tool_selection == CMSTools.PATH_BUILDER.value:
             file_path_input = Prompt.ask("[bold green]Enter path to the file containing submissions[/bold green]", console=console)
             path_type_selection = prompt_from_numbered_list(console, "Which type of path would you like to build?", CMSPathTypes.get_values())
-            result = handle_cms_path_builder(file_path_input, path_type_selection)
+            result = handle_cms_path_builder(file_path_input, path_type_selection, console=console)
 
         elif tool_selection == CMSTools.INTERACTIVE_PATH_BUILDER.value:
             path_types = [CMSPathTypes.PRODUCT.value, CMSPathTypes.PRODUCT_POST_LICENCE_FOLDER.value]

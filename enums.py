@@ -20,6 +20,11 @@ class CMSFolders(BaseEnum):
     POST_LICENCE = "i) Post Licence"
     ORIGINAL_SUBMISSION = "j) Original Submission"
 
+class CMSFoldersOld(BaseEnum):
+    CORRESPONDENCE = "1) Correspondence"
+    FORMS = "2) Forms"
+    EVIDENCE = "3) Evidence"
+    ASSESSMENT = "4) Assessment"
 
 class CMSPathTypes(BaseEnum):
     PRODUCT = "Product"
