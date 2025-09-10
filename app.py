@@ -1,6 +1,6 @@
 import logging
 import openpyxl
-from enums import CMSTools, CMSPathTypes
+from enums import CMSTools, CMSPathTypes, CMSFolders, CMSProductFolders
 from path_finder import PathFinder
 import shutil
 import tkinter as tk
@@ -241,18 +241,19 @@ def handle_bulk_uploader(file_path: str, generate_log_file: bool, create_missing
                 logging.info(f"Working on copying {row[1]} to {row[2]}")
 
             source_file = os.path.basename(row[1])
+            dest_path = row[2]
             cleaned_file_name = clean_filename(source_file)
             # Create the full destination path with the new filename
-            full_dest_path = os.path.join(row[2], cleaned_file_name)
+            full_dest_path = os.path.join(dest_path, cleaned_file_name)
 
             # Check if row destination is empty
-            if row[2] is None:
+            if dest_path is None:
                 print("Row destination is empty! Skipping...")
                 if generate_log_file:
                     logging.info("Row destination is empty! Skipping...")
 
             # Check CMS to see if the folder path of the destination exists
-            elif not os.path.exists(row[2]):
+            elif not os.path.exists(dest_path):
                 print("Destination folder path doesn't exist in CMS!")
                 if generate_log_file:
                     logging.info("Destination folder path doesn't exist in CMS!")
@@ -260,12 +261,38 @@ def handle_bulk_uploader(file_path: str, generate_log_file: bool, create_missing
                 # Create the path
                 if create_missing_paths:
                     # Create the necessary directories (destination)
-                    os.makedirs(row[2])
+                    os.makedirs(dest_path)
                     # Copy source file to the destination
                     shutil.copy2(row[1], full_dest_path)
                     print("Created missing path and copied file to it!")
+
                     if generate_log_file:
                         logging.info("Created missing path and copied file to it!")
+
+                    # Create the correct folder structure if the folders are missing
+                    # This will reduce manual work of creating the folders later if they don't exist
+                    # If Submissions folder only create the structure there for now.
+                    if CMSProductFolders.SUBMISSIONS.value in dest_path:
+
+                        target_folders = [
+                            CMSFolders.CORRESPONDENCE_GENERAL.value,
+                            CMSFolders.POST_LICENCE.value
+                        ]
+
+                        # Check if dest_path ends with any of the target folders
+                        if any(dest_path.endswith(folder) for folder in target_folders):
+
+                            parent_path = os.path.dirname(dest_path)
+                            parent_path_folders = os.listdir(parent_path)
+
+                            for item in CMSFolders.get_values():
+                                if item not in parent_path_folders:
+                                    os.makedirs(os.path.join(parent_path, item))
+
+                            print("Created missing folders to complete the folder structure.")
+
+                            if generate_log_file:
+                                logging.info("Created missing folders to complete the folder structure.")
 
                 # If the folder create missing paths is not checked exist skip
                 else:

@@ -7,6 +7,9 @@ class BaseEnum(Enum):
         """Returns a list of all the values in the enum."""
         return [member.value for member in cls]
 
+class CMSProductFolders(BaseEnum):
+    APPLICATION_WORKBOOKS = "Application Workbooks"
+    SUBMISSIONS = "Submissions"
 
 class CMSFolders(BaseEnum):
     CORRESPONDENCE_GENERAL = "a) Correspondence General"
