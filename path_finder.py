@@ -123,9 +123,6 @@ class PathFinder:
                 if POST_LICENCE_FOLDER_NAME.lower() in folder.lower():
                     return os.path.join(file_path, folder)
         # Post Licence folder not found - Create path based on pattern
-        if CMSProductFolders.APPLICATION_WORKBOOKS.value in file_path:
-            return os.path.join(file_path, POST_LICENCE_FOLDER_NAME)
-
         return os.path.join(file_path, CMSFolders.POST_LICENCE.value)
 
     def find_product_correspondence_general_folder(self, file_number: str):

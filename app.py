@@ -271,28 +271,25 @@ def handle_bulk_uploader(file_path: str, generate_log_file: bool, create_missing
 
                     # Create the correct folder structure if the folders are missing
                     # This will reduce manual work of creating the folders later if they don't exist
-                    # If Submissions folder only create the structure there for now.
-                    if CMSProductFolders.SUBMISSIONS.value in dest_path:
+                    target_folders = [
+                        CMSFolders.CORRESPONDENCE_GENERAL.value,
+                        CMSFolders.POST_LICENCE.value
+                    ]
 
-                        target_folders = [
-                            CMSFolders.CORRESPONDENCE_GENERAL.value,
-                            CMSFolders.POST_LICENCE.value
-                        ]
+                    # Check if dest_path ends with any of the target folders
+                    if any(dest_path.endswith(folder) for folder in target_folders):
 
-                        # Check if dest_path ends with any of the target folders
-                        if any(dest_path.endswith(folder) for folder in target_folders):
+                        parent_path = os.path.dirname(dest_path)
+                        parent_path_folders = os.listdir(parent_path)
 
-                            parent_path = os.path.dirname(dest_path)
-                            parent_path_folders = os.listdir(parent_path)
+                        for item in CMSFolders.get_values():
+                            if item not in parent_path_folders:
+                                os.makedirs(os.path.join(parent_path, item))
 
-                            for item in CMSFolders.get_values():
-                                if item not in parent_path_folders:
-                                    os.makedirs(os.path.join(parent_path, item))
+                        print("Created missing folders to complete the folder structure.")
 
-                            print("Created missing folders to complete the folder structure.")
-
-                            if generate_log_file:
-                                logging.info("Created missing folders to complete the folder structure.")
+                        if generate_log_file:
+                            logging.info("Created missing folders to complete the folder structure.")
 
                 # If the folder create missing paths is not checked exist skip
                 else:
