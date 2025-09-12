@@ -1,6 +1,6 @@
 import logging
 import openpyxl
-from enums import CMSTools, CMSPathTypes, CMSFolders, CMSProductFolders
+from enums import CMSTools, CMSPathTypes, CMSFolders, CMSProductFolders, WorkloadManagementFormNames
 from path_finder import PathFinder
 import shutil
 import tkinter as tk
@@ -304,6 +304,30 @@ def handle_bulk_uploader(file_path: str, generate_log_file: bool, create_missing
                 print("File copied successfully!")
                 if generate_log_file:
                     logging.info("File copied successfully!")
+
+            # Handle naming Workload Management Form in CMS
+            elif os.path.exists(full_dest_path) and is_workload_management_form(full_dest_path):
+                name_part, extension = os.path.splitext(cleaned_file_name)
+
+                print(f"{name_part} already exists at the destination! Incrementing file name...")
+                if generate_log_file:
+                    logging.info(f"{name_part} already exists at the destination! Incrementing file name...")
+
+                count = 0
+                file_name = cleaned_file_name
+                new_full_dest_path = os.path.join(dest_path, file_name)
+
+                while os.path.exists(new_full_dest_path):
+                    count += 1
+                    file_name = f"{name_part} ({count}){extension}"
+                    new_full_dest_path = os.path.join(dest_path, file_name)
+
+                # # Copy source file to the destination
+                shutil.copy2(row[1], new_full_dest_path)
+                print("File copied successfully!")
+                if generate_log_file:
+                    logging.info("File copied successfully!")
+
 
             # If the file exists don't overwrite it
             else:

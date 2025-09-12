@@ -53,3 +53,8 @@ class CMSTools(BaseEnum):
     BULK_UPLOADER = "Bulk Uploader"
     INTERACTIVE_PATH_BUILDER = "Interactive Path Builder"
 
+class WorkloadManagementFormNames(BaseEnum):
+    PRODUCTS_SOLD_IN_CANADA = "Workload Management Form – Products Sold in Canada – Response"
+    MANUFACTURED_IN_CANADA = "Workload Management Form – Manufactured in Canada – Response"
+    PRODUITS_VENDUS_AU_CANADA = "Formulaire de gestion de la charge de travail – Produits vendus au Canada – Réponse"
+    FABRIQUE_AU_CANADA = "Formulaire de gestion de la charge de travail – Fabriqué au Canada – Réponse"

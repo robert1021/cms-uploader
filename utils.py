@@ -2,7 +2,7 @@ from rich.console import Console
 from rich.prompt import Prompt
 from typing import List
 import re
-from enums import SubmissionsFileExcelColumns
+from enums import SubmissionsFileExcelColumns, WorkloadManagementFormNames
 import os
 from constants import DRIVE_LETTER, CMS_FOLDER, Y_DRIVE_PATH
 import subprocess
@@ -188,3 +188,15 @@ def map_network_drive(drive_letter, network_path, username=None, password=None):
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
         return False
+
+def is_workload_management_form(text: str) -> bool:
+    """
+    Checks if the given text contains the name of a Workload Management Form.
+
+    Args:
+        text: The String to check for the name of a Workload Management Form.
+
+    Returns:
+        True if the text contains a form name, False otherwise.
+    """
+    return any(name.lower() in text.lower() for name in WorkloadManagementFormNames.get_values())
