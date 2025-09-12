@@ -190,7 +190,7 @@ def handle_interactive_cms_path_builder(path_type: str, is_submissions_file_path
     return "success"
 
 
-def handle_bulk_uploader(file_path: str, generate_log_file: bool, create_missing_paths: bool) -> str:
+def handle_bulk_uploader(file_path: str, generate_log_file: bool, create_missing_paths: bool, console=None) -> str:
     """
     Handle bulk uploading of files to the CMS based on the information provided in the Excel file.
 
@@ -376,8 +376,18 @@ def run_app():
             result = handle_interactive_cms_path_builder(path_type_selection, is_submissions_file_path, console)
 
         elif tool_selection == CMSTools.BULK_UPLOADER.value:
-            file_path_input = Prompt.ask("[bold green]Enter path to the file containing submissions, along with their source and destination information[/bold green]", console=console)
-            result = handle_bulk_uploader(file_path_input, True, True)
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes('-topmost', True)
+
+            console.print("Select file containing submissions, along with their source and destination information:", style="bold green")
+
+            file_path = filedialog.askopenfilename(
+                title="Select file containing submissions, along with their source and destination information",
+                filetypes=[("Excel files", "*.xlsx")]
+            )
+
+            result = handle_bulk_uploader(file_path, True, True, console=console)
 
         console.print(f"{result}", style="bold green")
         run_another_input = Prompt.ask(prompt="[bold blue]Would you like to run another tool?[/bold blue]", choices=["Yes", "No"], show_choices=True, case_sensitive=False, console=console)
