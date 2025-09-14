@@ -344,7 +344,7 @@ def handle_bulk_uploader(file_path: str, generate_log_file: bool, create_missing
 
 def run_app():
     console = Console()
-    console.print("CMS Automation Tool", style="bold green")
+    console.print(f"{APP_NAME}", style="bold green")
     console.print(f"{'-'*50}", style="bold blue")
 
     while True:
