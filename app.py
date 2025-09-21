@@ -85,7 +85,12 @@ def handle_interactive_cms_path_builder(path_type: str, is_submissions_file_path
     cms_path_finder = PathFinder()
    
     if is_submissions_file_path.lower() == "yes":
-        submissions_file_path = Prompt.ask("[bold green]Enter path to the file containing submissions[/bold green]", console=console)
+        console.print("Select Excel file containing the submissions: ", style="bold green")
+
+        submissions_file_path = filedialog.askopenfilename(
+            title="Select Excel file containing the submissions: ",
+            filetypes=[("Excel files", "*.xlsx")]
+        )
 
         if not os.path.isfile(submissions_file_path):
             return "error - file path"
