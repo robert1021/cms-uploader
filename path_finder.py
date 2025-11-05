@@ -144,6 +144,18 @@ class PathFinder:
         # Correspondence General folder not found - Create path based on pattern
         return os.path.join(file_path, CMSFolders.CORRESPONDENCE_GENERAL.value)
 
+    def find_product_decision_folder(self, file_number: str):
+        """
+        Finds the decision product folder based on the given parameters.
+
+        :param file_number: The file number.
+
+        :return: The path to the decision folder.
+        """
+        file_path = self.find_product_folder(file_number)
+
+        return os.path.join(file_path, CMSFolders.DECISION.value)
+
     def find_cms_paths_for_submissions(self, submissions: List[str], path_type: str, console=None) -> Dict[str, str]:
         """
         Finds the CMS destination paths for a list of submissions.
@@ -186,6 +198,9 @@ class PathFinder:
 
                 elif path_type == CMSPathTypes.PRODUCT_CORRESPONDENCE_GENERAL_FOLDER.value:
                     path = self.find_product_correspondence_general_folder(submission_id)
+
+                elif path_type == CMSPathTypes.PRODUCT_DECISION_FOLDER.value:
+                    path = self.find_product_decision_folder(submission_id)
                 # Store the found path in the dictionary
                 submission_cms_path_dict[sub] = path if path is not None else ""
 

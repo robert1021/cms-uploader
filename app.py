@@ -278,7 +278,8 @@ def handle_bulk_uploader(file_path: str, generate_log_file: bool, create_missing
                     # This will reduce manual work of creating the folders later if they don't exist
                     target_folders = [
                         CMSFolders.CORRESPONDENCE_GENERAL.value,
-                        CMSFolders.POST_LICENCE.value
+                        CMSFolders.POST_LICENCE.value,
+                        CMSFolders.DECISION.value
                     ]
 
                     # Check if dest_path ends with any of the target folders
@@ -371,11 +372,16 @@ def run_app():
 
         elif tool_selection == CMSTools.PATH_BUILDER.value:
             file_path_input = Prompt.ask("[bold green]Enter path to the file containing submissions[/bold green]", console=console)
-            path_type_selection = prompt_from_numbered_list(console, "Which type of path would you like to build?", CMSPathTypes.get_values())
+            path_types = [CMSPathTypes.PRODUCT.value, CMSPathTypes.PRODUCT_POST_LICENCE_FOLDER.value,
+                          CMSPathTypes.PRODUCT_CORRESPONDENCE_GENERAL_FOLDER.value,
+                          CMSPathTypes.PRODUCT_DECISION_FOLDER.value]
+            path_type_selection = prompt_from_numbered_list(console, "Which type of path would you like to build?", path_types)
             result = handle_cms_path_builder(file_path_input, path_type_selection, console=console)
 
         elif tool_selection == CMSTools.INTERACTIVE_PATH_BUILDER.value:
-            path_types = [CMSPathTypes.PRODUCT.value, CMSPathTypes.PRODUCT_POST_LICENCE_FOLDER.value]
+            path_types = [CMSPathTypes.PRODUCT.value, CMSPathTypes.PRODUCT_POST_LICENCE_FOLDER.value,
+                          CMSPathTypes.PRODUCT_CORRESPONDENCE_GENERAL_FOLDER.value,
+                          CMSPathTypes.PRODUCT_DECISION_FOLDER.value]
             path_type_selection = prompt_from_numbered_list(console, "Which type of path would you like to build?", path_types)
             is_submissions_file_path = Prompt.ask(prompt="[bold green]Would you like to enter the path to the file containing submissions?[/bold green]", choices=["Yes", "No"], show_choices=True, case_sensitive=False, console=console)
             result = handle_interactive_cms_path_builder(path_type_selection, is_submissions_file_path, console)
