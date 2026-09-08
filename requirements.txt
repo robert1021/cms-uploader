@@ -1,3 +1,4 @@
+beautifulsoup4
 extract-msg
 openpyxl~=3.1.5
 rich~=13.9.2

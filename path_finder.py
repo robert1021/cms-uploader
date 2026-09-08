@@ -59,6 +59,8 @@ class PathFinder:
             else:
                 range_path = fallback_path
 
+        if range_path is None:
+            return None
         # Get a filtered list of relevant folders
         folders = [folder for folder in os.listdir(range_path) if
                    file_number.lower() in folder and os.path.isdir(os.path.join(range_path, folder))]
@@ -118,12 +120,12 @@ class PathFinder:
         :return: The path to the Post Licence folder.
         """
         file_path = self.find_product_folder(file_number)
-        if os.path.isdir(file_path):
+        if file_path and os.path.isdir(file_path):
             for folder in os.listdir(file_path):
                 if POST_LICENCE_FOLDER_NAME.lower() in folder.lower():
                     return os.path.join(file_path, folder)
         # Post Licence folder not found - Create path based on pattern
-        return os.path.join(file_path, CMSFolders.POST_LICENCE.value)
+        return os.path.join(file_path, CMSFolders.POST_LICENCE.value) if file_path else None
 
     def find_product_correspondence_general_folder(self, file_number: str):
         """
@@ -135,14 +137,14 @@ class PathFinder:
         """
         file_path = self.find_product_folder(file_number)
 
-        if os.path.isdir(file_path):
+        if file_path and os.path.isdir(file_path):
             for folder in os.listdir(file_path):
                 if CMSFolders.CORRESPONDENCE_GENERAL.value.lower() in folder.lower():
                     return os.path.join(file_path, folder)
                 elif CMSFoldersOld.CORRESPONDENCE.value.lower() in folder.lower():
                     return os.path.join(file_path, folder)
         # Correspondence General folder not found - Create path based on pattern
-        return os.path.join(file_path, CMSFolders.CORRESPONDENCE_GENERAL.value)
+        return os.path.join(file_path, CMSFolders.CORRESPONDENCE_GENERAL.value) if file_path else None
 
     def find_product_decision_folder(self, file_number: str):
         """
@@ -153,6 +155,9 @@ class PathFinder:
         :return: The path to the decision folder.
         """
         file_path = self.find_product_folder(file_number)
+
+        if not file_path:
+            return None
 
         return os.path.join(file_path, CMSFolders.DECISION.value)
 

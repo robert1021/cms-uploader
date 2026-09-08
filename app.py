@@ -234,7 +234,7 @@ def handle_bulk_uploader(file_path: str, generate_log_file: bool, create_missing
 
     # Configure the logger
     if generate_log_file:
-        logging.basicConfig(level=logging.INFO, filename="bulkUploader.log", filemode="w",
+        logging.basicConfig(level=logging.INFO, filename="bulkUploader2.log", filemode="w",
                             format="%(asctime)s - %(levelname)s - %(message)s")
         logging.info("File upload started...")
 
