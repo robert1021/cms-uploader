@@ -232,7 +232,7 @@ def handle_bulk_uploader(file_path: str, generate_log_file: bool, create_missing
     if not validate_bulk_uploader_excel_columns(submissions_col, source_col, dest_col):
         return "error - excel file columns"
 
-    # Configure the logger — also log submission, source file and new full path per row
+    # Configure the logger - also log submission, source file and new full path per row
     if generate_log_file:
         # use log next to the Excel when possible, fall back to cwd
         try:
@@ -256,9 +256,9 @@ def handle_bulk_uploader(file_path: str, generate_log_file: bool, create_missing
         _cleaned = clean_filename(os.path.basename(_src_str)) if _src_str else ""
         _full_dest = os.path.join(_dst_str, _cleaned) if _dst_str and _cleaned else (_dst_str or _cleaned or "")
         try:
-            print(f"[{_submission}] Working on file '{_src_str}' → '{_dst_str}' | New full path: '{_full_dest}'")
+            print(f"[{_submission}] Working on file '{_src_str}' -> '{_dst_str}' | New full path: '{_full_dest}'")
             if generate_log_file:
-                logging.info(f"[{_submission}] Working on file '{_src_str}' → destination folder '{_dst_str}' | New full path: '{_full_dest}' | Submission: '{_submission}'")
+                logging.info(f"[{_submission}] Working on file '{_src_str}' -> destination folder '{_dst_str}' | New full path: '{_full_dest}' | Submission: '{_submission}'")
 
             # keep original variable names for copy logic but derived from the detailed context
             source_file = os.path.basename(_src_str) if _src_str else ""
@@ -289,10 +289,10 @@ def handle_bulk_uploader(file_path: str, generate_log_file: bool, create_missing
                     os.makedirs(_dst_str, exist_ok=True)
                     # Copy source file to the destination
                     shutil.copy2(_src_str, full_dest_path)
-                    print(f"[{_submission}] COPIED (created missing folder) - file '{_src_str}' → '{full_dest_path}' | Submission: '{_submission}'")
+                    print(f"[{_submission}] COPIED (created missing folder) - file '{_src_str}' -> '{full_dest_path}' | Submission: '{_submission}'")
 
                     if generate_log_file:
-                        logging.info(f"[{_submission}] COPIED (created missing folder) - file '{_src_str}' → '{full_dest_path}' | Submission: '{_submission}'")
+                        logging.info(f"[{_submission}] COPIED (created missing folder) - file '{_src_str}' -> '{full_dest_path}' | Submission: '{_submission}'")
 
                     # Create the correct folder structure if the folders are missing
                     # This will reduce manual work of creating the folders later if they don't exist
@@ -322,25 +322,25 @@ def handle_bulk_uploader(file_path: str, generate_log_file: bool, create_missing
 
                 # If the folder create missing paths is not checked exist skip
                 else:
-                    print(f"[{_submission}] SKIP (create_missing disabled) - file '{_src_str}' not copied — destination '{_dst_str}' missing | Would have been: '{full_dest_path}'")
+                    print(f"[{_submission}] SKIP (create_missing disabled) - file '{_src_str}' not copied - destination '{_dst_str}' missing | Would have been: '{full_dest_path}'")
                     if generate_log_file:
-                        logging.info(f"[{_submission}] SKIP (create_missing disabled) - file '{_src_str}' not copied — destination '{_dst_str}' missing | Would have been: '{full_dest_path}' | Submission: '{_submission}'")
+                        logging.info(f"[{_submission}] SKIP (create_missing disabled) - file '{_src_str}' not copied - destination '{_dst_str}' missing | Would have been: '{full_dest_path}' | Submission: '{_submission}'")
 
             # Check CMS to see if the source file already exists at the destination
             elif not os.path.exists(full_dest_path):
                 # Copy source file to the destination
                 shutil.copy2(_src_str, full_dest_path)
-                print(f"[{_submission}] COPIED - file '{_src_str}' → '{full_dest_path}' | Submission: '{_submission}'")
+                print(f"[{_submission}] COPIED - file '{_src_str}' -> '{full_dest_path}' | Submission: '{_submission}'")
                 if generate_log_file:
-                    logging.info(f"[{_submission}] COPIED - file '{_src_str}' → '{full_dest_path}' | Submission: '{_submission}'")
+                    logging.info(f"[{_submission}] COPIED - file '{_src_str}' -> '{full_dest_path}' | Submission: '{_submission}'")
 
             # Handle naming Workload Management Form in CMS
             elif os.path.exists(full_dest_path) and is_workload_management_form(full_dest_path):
                 name_part, extension = os.path.splitext(cleaned_file_name)
 
-                print(f"[{_submission}] Workload Management Form '{name_part}' already exists at '{full_dest_path}' — incrementing filename for file '{_src_str}' | Submission: '{_submission}'")
+                print(f"[{_submission}] Workload Management Form '{name_part}' already exists at '{full_dest_path}' - incrementing filename for file '{_src_str}' | Submission: '{_submission}'")
                 if generate_log_file:
-                    logging.info(f"[{_submission}] Workload Management Form exists at '{full_dest_path}' for file '{_src_str}' — incrementing filename | Submission: '{_submission}'")
+                    logging.info(f"[{_submission}] Workload Management Form exists at '{full_dest_path}' for file '{_src_str}' - incrementing filename | Submission: '{_submission}'")
 
                 count = 0
                 file_name = cleaned_file_name
@@ -353,21 +353,21 @@ def handle_bulk_uploader(file_path: str, generate_log_file: bool, create_missing
 
                 # # Copy source file to the destination
                 shutil.copy2(_src_str, new_full_dest_path)
-                print(f"[{_submission}] COPIED (workload form incremented) - file '{_src_str}' → '{new_full_dest_path}' | Submission: '{_submission}' | Original full path was '{full_dest_path}'")
+                print(f"[{_submission}] COPIED (workload form incremented) - file '{_src_str}' -> '{new_full_dest_path}' | Submission: '{_submission}' | Original full path was '{full_dest_path}'")
                 if generate_log_file:
-                    logging.info(f"[{_submission}] COPIED (workload form incremented) - file '{_src_str}' → '{new_full_dest_path}' | Submission: '{_submission}' | Original full path was '{full_dest_path}'")
+                    logging.info(f"[{_submission}] COPIED (workload form incremented) - file '{_src_str}' -> '{new_full_dest_path}' | Submission: '{_submission}' | Original full path was '{full_dest_path}'")
 
 
             # If the file exists don't overwrite it
             else:
-                print(f"[{_submission}] SKIP - Already exists — file '{_src_str}' already at '{full_dest_path}' | Submission: '{_submission}'")
+                print(f"[{_submission}] SKIP - Already exists - file '{_src_str}' already at '{full_dest_path}' | Submission: '{_submission}'")
                 if generate_log_file:
-                    logging.info(f"[{_submission}] SKIP - Already exists — file '{_src_str}' already at '{full_dest_path}' | Submission: '{_submission}'")
+                    logging.info(f"[{_submission}] SKIP - Already exists - file '{_src_str}' already at '{full_dest_path}' | Submission: '{_submission}'")
         except Exception as e:
             # Log the error with full context
-            print(f"[{_submission}] ERROR - file '{_src_str}' → '{_full_dest}' | Submission: '{_submission}' | Error: {e}")
+            print(f"[{_submission}] ERROR - file '{_src_str}' -> '{_full_dest}' | Submission: '{_submission}' | Error: {e}")
             if generate_log_file:
-                logging.error(f"[{_submission}] ERROR - file '{_src_str}' → '{_full_dest}' | Submission: '{_submission}' | Error: {e}")
+                logging.error(f"[{_submission}] ERROR - file '{_src_str}' -> '{_full_dest}' | Submission: '{_submission}' | Error: {e}")
 
     return "success"
 
