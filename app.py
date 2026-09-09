@@ -232,47 +232,67 @@ def handle_bulk_uploader(file_path: str, generate_log_file: bool, create_missing
     if not validate_bulk_uploader_excel_columns(submissions_col, source_col, dest_col):
         return "error - excel file columns"
 
-    # Configure the logger
+    # Configure the logger — also log submission, source file and new full path per row
     if generate_log_file:
-        logging.basicConfig(level=logging.INFO, filename="bulkUploader2.log", filemode="w",
-                            format="%(asctime)s - %(levelname)s - %(message)s")
-        logging.info("File upload started...")
+        # use log next to the Excel when possible, fall back to cwd
+        try:
+            _log_dir = os.path.dirname(os.path.abspath(file_path)) if file_path else os.getcwd()
+        except Exception:
+            _log_dir = os.getcwd()
+        _log_path = os.path.join(_log_dir, "bulkUploader.log")
+        # fallback name kept for backwards compat — also log to bulkUploader2.log if different
+        logging.basicConfig(level=logging.INFO, filename=_log_path, filemode="w",
+                            format="%(asctime)s - %(levelname)s - %(message)s", force=True)
+        logging.info(f"File upload started — Excel: '{file_path}' | Log: '{_log_path}' | create_missing={create_missing_paths}")
 
     for row in ws.iter_rows(min_row=2, max_col=3, values_only=True):
+        # pre-compute detailed context for every row (submission, file, new full path) even before try
+        _sub_raw = row[0]
+        _src_raw = row[1]
+        _dst_raw = row[2]
+        _submission = str(_sub_raw).strip() if _sub_raw is not None else ""
+        _src_str = str(_src_raw).strip() if _src_raw is not None else ""
+        _dst_str = str(_dst_raw).strip() if _dst_raw is not None else ""
+        _cleaned = clean_filename(os.path.basename(_src_str)) if _src_str else ""
+        _full_dest = os.path.join(_dst_str, _cleaned) if _dst_str and _cleaned else (_dst_str or _cleaned or "")
         try:
-            print(f"{str(row[0])}")
-            print(f"Working on copying {row[1]} to {row[2]}")
+            print(f"[{_submission}] Working on file '{_src_str}' → '{_dst_str}' | New full path: '{_full_dest}'")
             if generate_log_file:
-                logging.info(f"Working on copying {row[1]} to {row[2]}")
+                logging.info(f"[{_submission}] Working on file '{_src_str}' → destination folder '{_dst_str}' | New full path: '{_full_dest}' | Submission: '{_submission}'")
 
-            source_file = os.path.basename(row[1])
-            dest_path = row[2]
-            cleaned_file_name = clean_filename(source_file)
+            # keep original variable names for copy logic but derived from the detailed context
+            source_file = os.path.basename(_src_str) if _src_str else ""
+            dest_path = _dst_raw  # use raw (None preserved for empty-check)
+            cleaned_file_name = clean_filename(source_file) if source_file else ""
             # Create the full destination path with the new filename
-            full_dest_path = os.path.join(dest_path, cleaned_file_name)
+            if dest_path is not None and dest_path != "":
+                _dest_str_for_path = str(dest_path)
+            else:
+                _dest_str_for_path = _dst_str
+            full_dest_path = os.path.join(_dest_str_for_path, cleaned_file_name) if _dest_str_for_path and cleaned_file_name else _full_dest
 
             # Check if row destination is empty
-            if dest_path is None:
-                print("Row destination is empty! Skipping...")
+            if dest_path is None or (isinstance(dest_path, str) and not dest_path.strip()):
+                print(f"[{_submission}] SKIP - Row destination empty for file '{_src_str}' | Submission: '{_submission}' | No file created")
                 if generate_log_file:
-                    logging.info("Row destination is empty! Skipping...")
+                    logging.info(f"[{_submission}] SKIP - Row destination empty for file '{_src_str}' | Submission: '{_submission}' | No file created (destination was empty)")
 
             # Check CMS to see if the folder path of the destination exists
-            elif not os.path.exists(dest_path):
-                print("Destination folder path doesn't exist in CMS!")
+            elif not os.path.exists(_dst_str):
+                print(f"[{_submission}] Destination folder does not exist in CMS: '{_dst_str}' | File: '{_src_str}' | New full path would be: '{full_dest_path}'")
                 if generate_log_file:
-                    logging.info("Destination folder path doesn't exist in CMS!")
+                    logging.info(f"[{_submission}] Destination folder does not exist in CMS: '{_dst_str}' | File: '{_src_str}' | New full path would be: '{full_dest_path}' | Submission: '{_submission}'")
 
                 # Create the path
                 if create_missing_paths:
                     # Create the necessary directories (destination)
-                    os.makedirs(dest_path)
+                    os.makedirs(_dst_str, exist_ok=True)
                     # Copy source file to the destination
-                    shutil.copy2(row[1], full_dest_path)
-                    print("Created missing path and copied file to it!")
+                    shutil.copy2(_src_str, full_dest_path)
+                    print(f"[{_submission}] COPIED (created missing folder) - file '{_src_str}' → '{full_dest_path}' | Submission: '{_submission}'")
 
                     if generate_log_file:
-                        logging.info("Created missing path and copied file to it!")
+                        logging.info(f"[{_submission}] COPIED (created missing folder) - file '{_src_str}' → '{full_dest_path}' | Submission: '{_submission}'")
 
                     # Create the correct folder structure if the folders are missing
                     # This will reduce manual work of creating the folders later if they don't exist
@@ -283,67 +303,71 @@ def handle_bulk_uploader(file_path: str, generate_log_file: bool, create_missing
                     ]
 
                     # Check if dest_path ends with any of the target folders
-                    if any(dest_path.endswith(folder) for folder in target_folders):
+                    if any(_dst_str.endswith(folder) for folder in target_folders):
 
-                        parent_path = os.path.dirname(dest_path)
-                        parent_path_folders = os.listdir(parent_path)
+                        parent_path = os.path.dirname(_dst_str)
+                        try:
+                            parent_path_folders = os.listdir(parent_path)
+                        except Exception:
+                            parent_path_folders = []
 
                         for item in CMSFolders.get_values():
                             if item not in parent_path_folders:
-                                os.makedirs(os.path.join(parent_path, item))
+                                os.makedirs(os.path.join(parent_path, item), exist_ok=True)
 
-                        print("Created missing folders to complete the folder structure.")
+                        print(f"[{_submission}] Created sibling CMS folders under '{os.path.dirname(_dst_str)}' for file '{_src_str}' | Submission: '{_submission}'")
 
                         if generate_log_file:
-                            logging.info("Created missing folders to complete the folder structure.")
+                            logging.info(f"[{_submission}] Created sibling CMS folders under '{os.path.dirname(_dst_str)}' for file '{_src_str}' | Submission: '{_submission}'")
 
                 # If the folder create missing paths is not checked exist skip
                 else:
-                    print("Skipping...")
+                    print(f"[{_submission}] SKIP (create_missing disabled) - file '{_src_str}' not copied — destination '{_dst_str}' missing | Would have been: '{full_dest_path}'")
                     if generate_log_file:
-                        logging.info("Skipping...")
+                        logging.info(f"[{_submission}] SKIP (create_missing disabled) - file '{_src_str}' not copied — destination '{_dst_str}' missing | Would have been: '{full_dest_path}' | Submission: '{_submission}'")
 
             # Check CMS to see if the source file already exists at the destination
             elif not os.path.exists(full_dest_path):
                 # Copy source file to the destination
-                shutil.copy2(row[1], full_dest_path)
-                print("File copied successfully!")
+                shutil.copy2(_src_str, full_dest_path)
+                print(f"[{_submission}] COPIED - file '{_src_str}' → '{full_dest_path}' | Submission: '{_submission}'")
                 if generate_log_file:
-                    logging.info("File copied successfully!")
+                    logging.info(f"[{_submission}] COPIED - file '{_src_str}' → '{full_dest_path}' | Submission: '{_submission}'")
 
             # Handle naming Workload Management Form in CMS
             elif os.path.exists(full_dest_path) and is_workload_management_form(full_dest_path):
                 name_part, extension = os.path.splitext(cleaned_file_name)
 
-                print(f"{name_part} already exists at the destination! Incrementing file name...")
+                print(f"[{_submission}] Workload Management Form '{name_part}' already exists at '{full_dest_path}' — incrementing filename for file '{_src_str}' | Submission: '{_submission}'")
                 if generate_log_file:
-                    logging.info(f"{name_part} already exists at the destination! Incrementing file name...")
+                    logging.info(f"[{_submission}] Workload Management Form exists at '{full_dest_path}' for file '{_src_str}' — incrementing filename | Submission: '{_submission}'")
 
                 count = 0
                 file_name = cleaned_file_name
-                new_full_dest_path = os.path.join(dest_path, file_name)
+                new_full_dest_path = os.path.join(_dst_str, file_name)
 
                 while os.path.exists(new_full_dest_path):
                     count += 1
                     file_name = f"{name_part} ({count}){extension}"
-                    new_full_dest_path = os.path.join(dest_path, file_name)
+                    new_full_dest_path = os.path.join(_dst_str, file_name)
 
                 # # Copy source file to the destination
-                shutil.copy2(row[1], new_full_dest_path)
-                print("File copied successfully!")
+                shutil.copy2(_src_str, new_full_dest_path)
+                print(f"[{_submission}] COPIED (workload form incremented) - file '{_src_str}' → '{new_full_dest_path}' | Submission: '{_submission}' | Original full path was '{full_dest_path}'")
                 if generate_log_file:
-                    logging.info("File copied successfully!")
+                    logging.info(f"[{_submission}] COPIED (workload form incremented) - file '{_src_str}' → '{new_full_dest_path}' | Submission: '{_submission}' | Original full path was '{full_dest_path}'")
 
 
             # If the file exists don't overwrite it
             else:
-                print("File already exists at the destination! No creation necessary...")
+                print(f"[{_submission}] SKIP - Already exists — file '{_src_str}' already at '{full_dest_path}' | Submission: '{_submission}'")
                 if generate_log_file:
-                    logging.info("File already exists at the destination! No creation necessary...")
+                    logging.info(f"[{_submission}] SKIP - Already exists — file '{_src_str}' already at '{full_dest_path}' | Submission: '{_submission}'")
         except Exception as e:
-            # Log the error
+            # Log the error with full context
+            print(f"[{_submission}] ERROR - file '{_src_str}' → '{_full_dest}' | Submission: '{_submission}' | Error: {e}")
             if generate_log_file:
-                logging.error(str(e))
+                logging.error(f"[{_submission}] ERROR - file '{_src_str}' → '{_full_dest}' | Submission: '{_submission}' | Error: {e}")
 
     return "success"
 
