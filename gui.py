@@ -12,6 +12,7 @@ import threading
 import queue
 import logging
 import shutil
+import time
 import openpyxl
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
@@ -676,19 +677,40 @@ class BulkUploaderFrame(ttk.Frame):
         prog_row.pack(fill="x", pady=(8,0))
         self.prog = ttk.Progressbar(prog_row, mode="determinate")
         self.prog.pack(fill="x", expand=True, side="left")
-        self.prog_label = tk.Label(prog_row, text="", bg=CARD_BG, fg=MUTED, font=FONTS["small"], width=14, anchor="e")
+        self.prog_label = tk.Label(prog_row, text="0 / 0  0%", bg=CARD_BG, fg=MUTED, font=FONTS["small"], width=16, anchor="e")
         self.prog_label.pack(side="left", padx=8)
 
-        self.log = tk.Label(body, text="", bg=CARD_BG, fg=MUTED, font=FONTS["small"], wraplength=620, justify="left")
-        self.log.pack(fill="x", pady=6)
+        # live current-file + stats row
+        cur_row = tk.Frame(body, bg=CARD_BG)
+        cur_row.pack(fill="x", pady=(6,0))
+        self.current_var = tk.StringVar(value="")
+        self.current_label = tk.Label(cur_row, textvariable=self.current_var, bg=CARD_BG, fg="#1e293b", font=FONTS["mono"], anchor="w", wraplength=620, justify="left")
+        self.current_label.pack(side="left", fill="x", expand=True)
+        self.elapsed_var = tk.StringVar(value="")
+        tk.Label(cur_row, textvariable=self.elapsed_var, bg=CARD_BG, fg=MUTED, font=FONTS["mono"], width=10, anchor="e").pack(side="right", padx=(8,0))
 
-        outer2, body2 = card(self, "Log")
+        stats_row = tk.Frame(body, bg=CARD_BG)
+        stats_row.pack(fill="x", pady=2)
+        self.stats_var = tk.StringVar(value="")
+        tk.Label(stats_row, textvariable=self.stats_var, bg=CARD_BG, fg=MUTED, font=FONTS["small"], anchor="w", justify="left").pack(side="left", fill="x", expand=True)
+
+        self.log = tk.Label(body, text="", bg=CARD_BG, fg=MUTED, font=FONTS["small"], wraplength=620, justify="left")
+        self.log.pack(fill="x", pady=4)
+
+        outer2, body2 = card(self, "Live log  —  updates as each file is copied")
         outer2.pack(fill="both", expand=True, padx=16, pady=(0,16))
         self.text = tk.Text(body2, height=12, bg="#f8fafc", fg="#1e293b", font=FONTS["mono"], wrap="word", bd=0, highlightthickness=1, highlightbackground=BORDER)
         vs = ttk.Scrollbar(body2, orient="vertical", command=self.text.yview)
         self.text.configure(yscrollcommand=vs.set)
         self.text.pack(side="left", fill="both", expand=True)
         vs.pack(side="right", fill="y")
+        # colored tags for instant scan
+        self.text.tag_configure("info", foreground="#334155")
+        self.text.tag_configure("working", foreground=PRIMARY)
+        self.text.tag_configure("success", foreground=SUCCESS)
+        self.text.tag_configure("skip", foreground="#d97706")
+        self.text.tag_configure("error", foreground=DANGER)
+        self.text.tag_configure("muted", foreground=MUTED)
         self.text.configure(state="disabled")
 
     def _validate_common(self):
@@ -703,9 +725,9 @@ class BulkUploaderFrame(ttk.Frame):
             messagebox.showerror("CMS", "CMS not connected. Connect first.", parent=self); return None
         return fp
 
-    def _append(self, msg):
+    def _append(self, msg, tag="info"):
         self.text.configure(state="normal")
-        self.text.insert("end", msg + "\n")
+        self.text.insert("end", msg + "\n", tag)
         self.text.see("end")
         self.text.configure(state="disabled")
 
@@ -755,69 +777,175 @@ class BulkUploaderFrame(ttk.Frame):
 
         gen_log = self.gen_log_var.get()
         create_missing = self.create_missing_var.get()
+
+        # --- reset UI for live feedback ---
         self.text.configure(state="normal"); self.text.delete("1.0", "end"); self.text.configure(state="disabled")
         self.prog.configure(value=0)
-        self.prog_label.configure(text="0%")
-        self.run_btn.configure(state="disabled", text="Uploading…")
+        self.prog_label.configure(text="0 / 0  0%")
+        self.current_var.set("Starting… reading Excel…")
+        self.elapsed_var.set("00:00")
+        self.stats_var.set("Preparing…")
+        self.run_btn.configure(state="disabled", text="Uploading… 0/0")
         self.dry_btn.configure(state="disabled")
-        self.status_bar.set_message("Uploading to CMS…")
+        self.status_bar.set_message("Uploading to CMS… 0/0")
         self.log.configure(text="Starting…", fg=MUTED)
 
+        q: queue.Queue = queue.Queue()
+        start_ts = time.time()
+        self._bulk_running = True
+
+        def _fmt_elapsed(s: float) -> str:
+            m, sec = divmod(int(s), 60)
+            h, m = divmod(m, 60)
+            return f"{h:02d}:{m:02d}:{sec:02d}" if h else f"{m:02d}:{sec:02d}"
+
+        # helper to push colored log lines into the queue
+        def qlog(msg: str, tag: str = "info"):
+            q.put(("log", (msg, tag)))
+
+        # --- pump runs on the main thread (started BEFORE worker) ---
+        def pump():
+            # live elapsed tick
+            if getattr(self, "_bulk_running", False):
+                self.elapsed_var.set(_fmt_elapsed(time.time() - start_ts))
+            try:
+                while True:
+                    kind, payload = q.get_nowait()
+                    if kind == "log":
+                        if isinstance(payload, tuple) and len(payload) == 2:
+                            msg, tag = payload
+                        else:
+                            msg, tag = payload, "info"
+                        self._append(msg, tag)
+                    elif kind == "current":
+                        self.current_var.set(payload)
+                        # also mirror short text in the small label + status bar
+                        self.log.configure(text=payload[:120], fg=MUTED)
+                        self.status_bar.set_message(payload[:90])
+                    elif kind == "progress":
+                        d, t = payload
+                        pct = int(d * 100 / t) if t else 0
+                        self.prog.configure(value=pct)
+                        self.prog_label.configure(text=f"{d} / {t}  {pct}%")
+                        self.run_btn.configure(text=f"Uploading… {d}/{t}")
+                        self.status_bar.set_message(f"Uploading {d}/{t} ({pct}%)…")
+                    elif kind == "stats":
+                        # payload is dict {copied, skipped, errors, done, total}
+                        self.stats_var.set(
+                            f"Copied: {payload.get('copied', 0)}  ·  Skipped: {payload.get('skipped', 0)}  ·  Errors: {payload.get('errors', 0)}  ·  Done: {payload.get('done', 0)}/{payload.get('total', 0)}"
+                        )
+                    elif kind == "done":
+                        d, t, stats = payload
+                        self.prog.configure(value=100)
+                        self.prog_label.configure(text=f"{d} / {t}  100%")
+                        self.current_var.set(f"Done — {d}/{t} files")
+                        self.stats_var.set(f"Copied: {stats.get('copied',0)}  ·  Skipped: {stats.get('skipped',0)}  ·  Errors: {stats.get('errors',0)}  ·  Done: {d}/{t}")
+                        self.elapsed_var.set(_fmt_elapsed(time.time() - start_ts))
+                        self._bulk_running = False
+                        self._append(f"\nDone — processed {d}/{t} rows  ·  copied {stats.get('copied',0)} · skipped {stats.get('skipped',0)} · errors {stats.get('errors',0)} in {_fmt_elapsed(time.time()-start_ts)}", "muted")
+                        self.log.configure(text=f"Done — {d} rows processed. Copied {stats.get('copied',0)}, skipped {stats.get('skipped',0)}.", fg=SUCCESS)
+                        self.status_bar.set_message(f"Upload complete — {d}/{t} files in {_fmt_elapsed(time.time()-start_ts)}", "success")
+                        self.run_btn.configure(state="normal", text="Upload to CMS")
+                        self.dry_btn.configure(state="normal")
+                        messagebox.showinfo("Bulk Uploader", f"Done — processed {d} rows.\nCopied: {stats.get('copied',0)}  Skipped: {stats.get('skipped',0)}  Errors: {stats.get('errors',0)}\nTime: {_fmt_elapsed(time.time()-start_ts)}\nLog (if enabled) next to Excel.", parent=self)
+                    elif kind == "error":
+                        self._append(f"Fatal: {payload}", "error")
+                        self.log.configure(text=str(payload)[:120], fg=DANGER)
+                        self.status_bar.set_message("Upload failed", "error")
+                        self._bulk_running = False
+                        self.run_btn.configure(state="normal", text="Upload to CMS")
+                        self.dry_btn.configure(state="normal")
+                        messagebox.showerror("Upload failed", payload, parent=self)
+            except queue.Empty:
+                pass
+            if getattr(self, "_bulk_running", False):
+                self.after(80, pump)
+            else:
+                # one final drain of any straggling logs
+                try:
+                    while True:
+                        k, p = q.get_nowait()
+                        if k == "log":
+                            if isinstance(p, tuple) and len(p) == 2:
+                                self._append(p[0], p[1])
+                            else:
+                                self._append(p)
+                        elif k == "current":
+                            self.current_var.set(p)
+                except queue.Empty:
+                    pass
+
+        self.after(80, pump)
+
         def worker():
-            q = queue.Queue()
-            def gui_append(s):
-                q.put(("log", s))
-            # monkey-patch print for handle_bulk_uploader
             import builtins
             orig_print = builtins.print
+
+            def gui_append(s, tag="info"):
+                qlog(s, tag)
+
             def patched_print(*args, **kwargs):
-                gui_append(" ".join(str(a) for a in args))
+                # keep console output but also surface in live log
+                txt = " ".join(str(a) for a in args)
+                gui_append(txt, "muted")
                 orig_print(*args, **kwargs)
+
             builtins.print = patched_print
+            # live counters
+            stats = {"copied": 0, "skipped": 0, "errors": 0, "done": 0, "total": 0}
             try:
-                # run bulk logic but with progress callbacks - we re-implement inline for progress
                 wb = openpyxl.load_workbook(fp)
                 ws = wb.active
                 rows = list(ws.iter_rows(min_row=2, max_col=3, values_only=True))
                 total = len([r for r in rows if any(r)])
+                stats["total"] = total
+                q.put(("stats", dict(stats)))
+                q.put(("progress", (0, total)))
+                qlog(f"Found {total} row(s) to process", "info")
+                self.after(0, lambda: self.current_var.set(f"Found {total} files — starting…"))
                 if gen_log:
                     log_path = os.path.join(os.path.dirname(fp), "bulkUploader.log")
                     logging.basicConfig(level=logging.INFO, filename=log_path, filemode="w", format="%(asctime)s - %(levelname)s - %(message)s", force=True)
                     logging.info(f"File upload started - Excel: '{fp}' | Rows: {total} | create_missing={create_missing} | Log: '{log_path}'")
-                    q.put(("log", f"Logging to {log_path}"))
+                    qlog(f"Logging to {log_path}", "muted")
+                    q.put(("current", f"Logging to {log_path}"))
                 done = 0
                 for row in rows:
                     if not any(row):
                         continue
                     sub, src, dest = row[0], row[1], row[2]
-                    # detailed context for logging — submission, source file, new full path
                     submission = str(sub).strip() if sub is not None else ""
                     raw_src = str(src).strip() if src is not None else ""
                     raw_dest = str(dest).strip() if dest is not None else ""
                     cleaned_name = clean_filename(os.path.basename(raw_src)) if raw_src else ""
                     full_dest_path = os.path.join(raw_dest, cleaned_name) if raw_dest and cleaned_name else (raw_dest or cleaned_name or "")
-                    q.put(("progress", (done, total, f"{os.path.basename(raw_src) if raw_src else ''}")))
-                    q.put(("log", f"[{done+1}/{total}] {submission} - {raw_src} -> {raw_dest}"))
+                    # --- tell the UI what we're about to do (immediate feedback) ---
+                    cur_msg = f"[{done+1}/{total}] {submission} - {os.path.basename(raw_src) or '(no file)'} -> {raw_dest or '(no destination)'}"
+                    q.put(("current", cur_msg))
+                    qlog(f"[{done+1}/{total}] {submission} - {raw_src} -> {raw_dest}", "working")
                     if gen_log:
                         logging.info(f"[{submission}] Working on file '{raw_src}' -> destination folder '{raw_dest}' | New full path: '{full_dest_path}'")
-                    # replicate handle_bulk_uploader per-row logic
                     try:
                         src = raw_src
                         dest = raw_dest
+                        outcome = None
                         if not dest.strip():
-                            q.put(("log", "  -> Row destination empty, skipping"))
+                            qlog(f"  -> Row destination empty, skipping", "skip")
                             if gen_log: logging.info(f"[{submission}] SKIP - Row destination empty for file '{raw_src}' | Submission: '{submission}' | No file created (destination was empty)")
-                            done += 1; continue
+                            stats["skipped"] += 1; outcome = "skip"
+                            done += 1; stats["done"] = done
+                            q.put(("progress", (done, total))); q.put(("stats", dict(stats)))
+                            continue
                         if not os.path.exists(dest):
-                            q.put(("log", "  -> Destination missing"))
+                            qlog(f"  -> Destination missing: {raw_dest}", "skip")
                             if gen_log: logging.info(f"[{submission}] Destination folder does not exist in CMS: '{raw_dest}' | File: '{raw_src}' | New full path would be: '{full_dest_path}'")
                             if create_missing:
                                 os.makedirs(dest, exist_ok=True)
                                 full_dest = os.path.join(dest, clean_filename(os.path.basename(src)))
                                 shutil.copy2(src, full_dest)
-                                q.put(("log", f"  -> Created folder and copied -> {full_dest}"))
+                                qlog(f"  -> Created folder and copied -> {full_dest}", "success")
                                 if gen_log: logging.info(f"[{submission}] COPIED (created missing folder) - file '{raw_src}' -> '{full_dest}' | Submission: '{submission}'")
-                                # ensure sibling folders exist if needed
+                                stats["copied"] += 1; outcome = "copied"
                                 target_folders = [CMSFolders.CORRESPONDENCE_GENERAL.value, CMSFolders.POST_LICENCE.value, CMSFolders.DECISION.value]
                                 if any(dest.endswith(f) for f in target_folders):
                                     parent = os.path.dirname(dest)
@@ -828,19 +956,21 @@ class BulkUploaderFrame(ttk.Frame):
                                         if item not in existing:
                                             try: os.makedirs(os.path.join(parent, item), exist_ok=True)
                                             except: pass
-                                    q.put(("log", "  -> Ensured sibling CMS folders"))
+                                    qlog(f"  -> Ensured sibling CMS folders under {os.path.dirname(dest)}", "info")
                                     if gen_log: logging.info(f"[{submission}] Created sibling CMS folders under '{os.path.dirname(dest)}' for file '{raw_src}' | Submission: '{submission}'")
                             else:
-                                q.put(("log", "  -> Skipping (create missing disabled)"))
+                                qlog(f"  -> Skipping (create missing disabled)", "skip")
                                 if gen_log: logging.info(f"[{submission}] SKIP (create_missing disabled) - file '{raw_src}' not copied - destination '{raw_dest}' missing | Would have been: '{full_dest_path}' | Submission: '{submission}'")
+                                stats["skipped"] += 1; outcome = "skip"
                         elif not os.path.exists(os.path.join(dest, clean_filename(os.path.basename(src)))):
                             full_dest = os.path.join(dest, clean_filename(os.path.basename(src)))
                             shutil.copy2(src, full_dest)
-                            q.put(("log", f"  -> Copied -> {full_dest}"))
+                            qlog(f"  -> Copied -> {full_dest}", "success")
                             if gen_log: logging.info(f"[{submission}] COPIED - file '{raw_src}' -> '{full_dest}' | Submission: '{submission}'")
+                            stats["copied"] += 1; outcome = "copied"
                         elif is_workload_management_form(os.path.join(dest, clean_filename(os.path.basename(src)))):
-                            # workload form already exists — increment name
                             existing_full = os.path.join(dest, clean_filename(os.path.basename(src)))
+                            qlog(f"  -> Workload form exists at {existing_full} - incrementing", "info")
                             if gen_log: logging.info(f"[{submission}] Workload Management Form exists at '{existing_full}' for file '{raw_src}' - incrementing filename | Submission: '{submission}'")
                             name_part, ext = os.path.splitext(clean_filename(os.path.basename(src)))
                             count = 0
@@ -851,66 +981,29 @@ class BulkUploaderFrame(ttk.Frame):
                                 fname = f"{name_part} ({count}){ext}"
                                 new_dest = os.path.join(dest, fname)
                             shutil.copy2(src, new_dest)
-                            q.put(("log", f"  -> Workload form - incremented -> {new_dest}"))
+                            qlog(f"  -> Workload form - incremented -> {new_dest}", "success")
                             if gen_log: logging.info(f"[{submission}] COPIED (workload form incremented) - file '{raw_src}' -> '{new_dest}' | Submission: '{submission}' | Original full path was '{existing_full}'")
+                            stats["copied"] += 1; outcome = "copied"
                         else:
-                            q.put(("log", "  -> Already exists, skipping"))
+                            qlog(f"  -> Already exists, skipping: {full_dest_path}", "skip")
                             if gen_log: logging.info(f"[{submission}] SKIP - Already exists - file '{raw_src}' already at '{full_dest_path}' | Submission: '{submission}'")
+                            stats["skipped"] += 1; outcome = "skip"
                     except Exception as e:
-                        q.put(("log", f"  ✗ Error: {e}"))
+                        qlog(f"  !! Error: {e}", "error")
                         if gen_log: logging.error(f"[{submission}] ERROR - file '{raw_src}' -> '{full_dest_path}' | Submission: '{submission}' | Error: {e}")
-                    done += 1
-                    q.put(("progress", (done, total, "")))
-                q.put(("done", (done, total)))
+                        stats["errors"] += 1; outcome = "error"
+                    done += 1; stats["done"] = done
+                    q.put(("progress", (done, total)))
+                    q.put(("stats", dict(stats)))
+                    # update current line with outcome
+                    if outcome:
+                        q.put(("current", f"[{done}/{total}] {submission} - {os.path.basename(raw_src) or ''}  [{outcome.upper()}]  -> {full_dest_path}"))
+                q.put(("done", (done, total, dict(stats))))
             except Exception as e:
                 q.put(("error", str(e)))
+                qlog(f"Fatal error: {e}", "error")
             finally:
                 builtins.print = orig_print
-                # drain handled via after loop
-
-            def pump():
-                try:
-                    while True:
-                        kind, payload = q.get_nowait()
-                        if kind == "log":
-                            self._append(payload)
-                        elif kind == "progress":
-                            d, t, name = payload
-                            pct = int(d*100/t) if t else 0
-                            self.prog.configure(value=pct)
-                            self.prog_label.configure(text=f"{pct}%")
-                            if name:
-                                self.log.configure(text=name, fg=MUTED)
-                        elif kind == "done":
-                            d, t = payload
-                            self.prog.configure(value=100)
-                            self.prog_label.configure(text="100%")
-                            self._append(f"\nDone — processed {d}/{t} rows.")
-                            self.log.configure(text=f"Done — {d} rows processed.", fg=SUCCESS)
-                            self.status_bar.set_message("Upload complete", "success")
-                            self.run_btn.configure(state="normal", text="Upload to CMS")
-                            self.dry_btn.configure(state="normal")
-                            messagebox.showinfo("Bulk Uploader", f"Done — processed {d} rows.\nLog (if enabled) next to Excel.", parent=self)
-                        elif kind == "error":
-                            self._append(f"Fatal: {payload}")
-                            self.log.configure(text=payload, fg=DANGER)
-                            self.status_bar.set_message("Upload failed", "error")
-                            self.run_btn.configure(state="normal", text="Upload to CMS")
-                            self.dry_btn.configure(state="normal")
-                            messagebox.showerror("Upload failed", payload, parent=self)
-                except queue.Empty:
-                    pass
-                # keep pumping until done button re-enabled
-                if str(self.run_btn["state"]) == "disabled":
-                    self.after(80, pump)
-                else:
-                    # one final drain
-                    try:
-                        while True:
-                            k, p = q.get_nowait()
-                            if k == "log": self._append(p)
-                    except: pass
-            self.after(80, pump)
 
         threading.Thread(target=worker, daemon=True).start()
 
