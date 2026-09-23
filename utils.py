@@ -59,6 +59,30 @@ def clean_filename(filename: str) -> str:
     # Rejoin the cleaned name with the original extension
     return cleaned_name_part + extension
 
+def get_next_available_path(dest_dir: str, filename: str) -> str:
+    """
+    Return the first non-existing path in dest_dir for filename,
+    Windows-style: 'Report.pdf' -> 'Report (1).pdf' -> 'Report (2).pdf' ...
+
+    If filename already ends with ' (n)', counting continues from n
+    (e.g. 'Report (1).pdf' -> 'Report (2).pdf'), never 'Report (1) (1).pdf'.
+    """
+    candidate = os.path.join(dest_dir, filename)
+    if not os.path.exists(candidate):
+        return candidate
+
+    name_part, extension = os.path.splitext(filename)
+    m = re.match(r'^(.*) \((\d+)\)$', name_part)
+    base = m.group(1) if m else name_part
+
+    count = 0
+    while True:
+        count += 1
+        new_name = f"{base} ({count}){extension}"
+        candidate = os.path.join(dest_dir, new_name)
+        if not os.path.exists(candidate):
+            return candidate
+
 def is_valid_file_path(file_path):
     """Checks if a given path is a valid file."""
     return os.path.isfile(file_path)

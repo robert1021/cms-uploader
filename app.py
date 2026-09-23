@@ -253,8 +253,8 @@ def handle_bulk_uploader(file_path: str, generate_log_file: bool, create_missing
         _submission = str(_sub_raw).strip() if _sub_raw is not None else ""
         _src_str = str(_src_raw).strip() if _src_raw is not None else ""
         _dst_str = str(_dst_raw).strip() if _dst_raw is not None else ""
-        _cleaned = clean_filename(os.path.basename(_src_str)) if _src_str else ""
-        _full_dest = os.path.join(_dst_str, _cleaned) if _dst_str and _cleaned else (_dst_str or _cleaned or "")
+        _base_name = os.path.basename(_src_str) if _src_str else ""
+        _full_dest = os.path.join(_dst_str, _base_name) if _dst_str and _base_name else (_dst_str or _base_name or "")
         try:
             print(f"[{_submission}] Working on file '{_src_str}' -> '{_dst_str}' | New full path: '{_full_dest}'")
             if generate_log_file:
@@ -263,13 +263,15 @@ def handle_bulk_uploader(file_path: str, generate_log_file: bool, create_missing
             # keep original variable names for copy logic but derived from the detailed context
             source_file = os.path.basename(_src_str) if _src_str else ""
             dest_path = _dst_raw  # use raw (None preserved for empty-check)
-            cleaned_file_name = clean_filename(source_file) if source_file else ""
+            # Preserve the source filename exactly (no stripping of ' (n)');
+            # collisions are resolved by incrementing to the next free name.
+            source_file_name = source_file
             # Create the full destination path with the new filename
             if dest_path is not None and dest_path != "":
                 _dest_str_for_path = str(dest_path)
             else:
                 _dest_str_for_path = _dst_str
-            full_dest_path = os.path.join(_dest_str_for_path, cleaned_file_name) if _dest_str_for_path and cleaned_file_name else _full_dest
+            full_dest_path = os.path.join(_dest_str_for_path, source_file_name) if _dest_str_for_path and source_file_name else _full_dest
 
             # Check if row destination is empty
             if dest_path is None or (isinstance(dest_path, str) and not dest_path.strip()):
@@ -287,7 +289,8 @@ def handle_bulk_uploader(file_path: str, generate_log_file: bool, create_missing
                 if create_missing_paths:
                     # Create the necessary directories (destination)
                     os.makedirs(_dst_str, exist_ok=True)
-                    # Copy source file to the destination
+                    # Copy source file to the destination (increment if raced)
+                    full_dest_path = get_next_available_path(_dst_str, source_file_name)
                     shutil.copy2(_src_str, full_dest_path)
                     print(f"[{_submission}] COPIED (created missing folder) - file '{_src_str}' -> '{full_dest_path}' | Submission: '{_submission}'")
 
@@ -326,7 +329,7 @@ def handle_bulk_uploader(file_path: str, generate_log_file: bool, create_missing
                     if generate_log_file:
                         logging.info(f"[{_submission}] SKIP (create_missing disabled) - file '{_src_str}' not copied - destination '{_dst_str}' missing | Would have been: '{full_dest_path}' | Submission: '{_submission}'")
 
-            # Check CMS to see if the source file already exists at the destination
+            # Copy, or Windows-style increment when the name is taken
             elif not os.path.exists(full_dest_path):
                 # Copy source file to the destination
                 shutil.copy2(_src_str, full_dest_path)
@@ -334,35 +337,17 @@ def handle_bulk_uploader(file_path: str, generate_log_file: bool, create_missing
                 if generate_log_file:
                     logging.info(f"[{_submission}] COPIED - file '{_src_str}' -> '{full_dest_path}' | Submission: '{_submission}'")
 
-            # Handle naming Workload Management Form in CMS
-            elif os.path.exists(full_dest_path) and is_workload_management_form(full_dest_path):
-                name_part, extension = os.path.splitext(cleaned_file_name)
-
-                print(f"[{_submission}] Workload Management Form '{name_part}' already exists at '{full_dest_path}' - incrementing filename for file '{_src_str}' | Submission: '{_submission}'")
-                if generate_log_file:
-                    logging.info(f"[{_submission}] Workload Management Form exists at '{full_dest_path}' for file '{_src_str}' - incrementing filename | Submission: '{_submission}'")
-
-                count = 0
-                file_name = cleaned_file_name
-                new_full_dest_path = os.path.join(_dst_str, file_name)
-
-                while os.path.exists(new_full_dest_path):
-                    count += 1
-                    file_name = f"{name_part} ({count}){extension}"
-                    new_full_dest_path = os.path.join(_dst_str, file_name)
-
-                # # Copy source file to the destination
-                shutil.copy2(_src_str, new_full_dest_path)
-                print(f"[{_submission}] COPIED (workload form incremented) - file '{_src_str}' -> '{new_full_dest_path}' | Submission: '{_submission}' | Original full path was '{full_dest_path}'")
-                if generate_log_file:
-                    logging.info(f"[{_submission}] COPIED (workload form incremented) - file '{_src_str}' -> '{new_full_dest_path}' | Submission: '{_submission}' | Original full path was '{full_dest_path}'")
-
-
-            # If the file exists don't overwrite it
             else:
-                print(f"[{_submission}] SKIP - Already exists - file '{_src_str}' already at '{full_dest_path}' | Submission: '{_submission}'")
+                new_full_dest_path = get_next_available_path(_dst_str, source_file_name)
+
+                print(f"[{_submission}] File '{source_file_name}' already exists at '{full_dest_path}' - incrementing filename for file '{_src_str}' | Submission: '{_submission}'")
                 if generate_log_file:
-                    logging.info(f"[{_submission}] SKIP - Already exists - file '{_src_str}' already at '{full_dest_path}' | Submission: '{_submission}'")
+                    logging.info(f"[{_submission}] File exists at '{full_dest_path}' for file '{_src_str}' - incrementing filename | Submission: '{_submission}'")
+
+                shutil.copy2(_src_str, new_full_dest_path)
+                print(f"[{_submission}] COPIED (incremented) - file '{_src_str}' -> '{new_full_dest_path}' | Submission: '{_submission}' | Original full path was '{full_dest_path}'")
+                if generate_log_file:
+                    logging.info(f"[{_submission}] COPIED (incremented) - file '{_src_str}' -> '{new_full_dest_path}' | Submission: '{_submission}' | Original full path was '{full_dest_path}'")
         except Exception as e:
             # Log the error with full context
             print(f"[{_submission}] ERROR - file '{_src_str}' -> '{_full_dest}' | Submission: '{_submission}' | Error: {e}")

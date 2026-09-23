@@ -25,7 +25,7 @@ from utils import (
     is_connected_to_vpn, is_connected_to_cms, is_xlsx_file,
     validate_bulk_uploader_excel_columns, validate_path_builder_excel_columns,
     validate_interactive_path_builder_excel_column, get_non_empty_column_values,
-    map_network_drive, clean_filename, is_workload_management_form
+    map_network_drive, get_next_available_path
 )
 from constants import DRIVE_LETTER, CMS_FOLDER
 
@@ -917,8 +917,8 @@ class BulkUploaderFrame(ttk.Frame):
                     submission = str(sub).strip() if sub is not None else ""
                     raw_src = str(src).strip() if src is not None else ""
                     raw_dest = str(dest).strip() if dest is not None else ""
-                    cleaned_name = clean_filename(os.path.basename(raw_src)) if raw_src else ""
-                    full_dest_path = os.path.join(raw_dest, cleaned_name) if raw_dest and cleaned_name else (raw_dest or cleaned_name or "")
+                    src_basename = os.path.basename(raw_src) if raw_src else ""
+                    full_dest_path = os.path.join(raw_dest, src_basename) if raw_dest and src_basename else (raw_dest or src_basename or "")
                     # --- tell the UI what we're about to do (immediate feedback) ---
                     cur_msg = f"[{done+1}/{total}] {submission} - {os.path.basename(raw_src) or '(no file)'} -> {raw_dest or '(no destination)'}"
                     q.put(("current", cur_msg))
@@ -941,7 +941,7 @@ class BulkUploaderFrame(ttk.Frame):
                             if gen_log: logging.info(f"[{submission}] Destination folder does not exist in CMS: '{raw_dest}' | File: '{raw_src}' | New full path would be: '{full_dest_path}'")
                             if create_missing:
                                 os.makedirs(dest, exist_ok=True)
-                                full_dest = os.path.join(dest, clean_filename(os.path.basename(src)))
+                                full_dest = get_next_available_path(dest, os.path.basename(src))
                                 shutil.copy2(src, full_dest)
                                 qlog(f"  -> Created folder and copied -> {full_dest}", "success")
                                 if gen_log: logging.info(f"[{submission}] COPIED (created missing folder) - file '{raw_src}' -> '{full_dest}' | Submission: '{submission}'")
@@ -962,32 +962,21 @@ class BulkUploaderFrame(ttk.Frame):
                                 qlog(f"  -> Skipping (create missing disabled)", "skip")
                                 if gen_log: logging.info(f"[{submission}] SKIP (create_missing disabled) - file '{raw_src}' not copied - destination '{raw_dest}' missing | Would have been: '{full_dest_path}' | Submission: '{submission}'")
                                 stats["skipped"] += 1; outcome = "skip"
-                        elif not os.path.exists(os.path.join(dest, clean_filename(os.path.basename(src)))):
-                            full_dest = os.path.join(dest, clean_filename(os.path.basename(src)))
+                        elif not os.path.exists(os.path.join(dest, os.path.basename(src))):
+                            full_dest = os.path.join(dest, os.path.basename(src))
                             shutil.copy2(src, full_dest)
                             qlog(f"  -> Copied -> {full_dest}", "success")
                             if gen_log: logging.info(f"[{submission}] COPIED - file '{raw_src}' -> '{full_dest}' | Submission: '{submission}'")
                             stats["copied"] += 1; outcome = "copied"
-                        elif is_workload_management_form(os.path.join(dest, clean_filename(os.path.basename(src)))):
-                            existing_full = os.path.join(dest, clean_filename(os.path.basename(src)))
-                            qlog(f"  -> Workload form exists at {existing_full} - incrementing", "info")
-                            if gen_log: logging.info(f"[{submission}] Workload Management Form exists at '{existing_full}' for file '{raw_src}' - incrementing filename | Submission: '{submission}'")
-                            name_part, ext = os.path.splitext(clean_filename(os.path.basename(src)))
-                            count = 0
-                            fname = clean_filename(os.path.basename(src))
-                            new_dest = os.path.join(dest, fname)
-                            while os.path.exists(new_dest):
-                                count += 1
-                                fname = f"{name_part} ({count}){ext}"
-                                new_dest = os.path.join(dest, fname)
-                            shutil.copy2(src, new_dest)
-                            qlog(f"  -> Workload form - incremented -> {new_dest}", "success")
-                            if gen_log: logging.info(f"[{submission}] COPIED (workload form incremented) - file '{raw_src}' -> '{new_dest}' | Submission: '{submission}' | Original full path was '{existing_full}'")
-                            stats["copied"] += 1; outcome = "copied"
                         else:
-                            qlog(f"  -> Already exists, skipping: {full_dest_path}", "skip")
-                            if gen_log: logging.info(f"[{submission}] SKIP - Already exists - file '{raw_src}' already at '{full_dest_path}' | Submission: '{submission}'")
-                            stats["skipped"] += 1; outcome = "skip"
+                            existing_full = os.path.join(dest, os.path.basename(src))
+                            new_dest = get_next_available_path(dest, os.path.basename(src))
+                            qlog(f"  -> Exists at {existing_full} - incrementing -> {new_dest}", "info")
+                            if gen_log: logging.info(f"[{submission}] File exists at '{existing_full}' for file '{raw_src}' - incrementing filename | Submission: '{submission}'")
+                            shutil.copy2(src, new_dest)
+                            qlog(f"  -> Incremented -> {new_dest}", "success")
+                            if gen_log: logging.info(f"[{submission}] COPIED (incremented) - file '{raw_src}' -> '{new_dest}' | Submission: '{submission}' | Original full path was '{existing_full}'")
+                            stats["copied"] += 1; outcome = "copied"
                     except Exception as e:
                         qlog(f"  !! Error: {e}", "error")
                         if gen_log: logging.error(f"[{submission}] ERROR - file '{raw_src}' -> '{full_dest_path}' | Submission: '{submission}' | Error: {e}")
